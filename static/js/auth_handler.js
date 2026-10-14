@@ -92,7 +92,19 @@
         })
         .catch(function (err) {
           var payload = err.data || {};
-          fail(payload.message || err.message || "Connexion impossible.");
+          var message = payload.message;
+          if (!message) {
+            // Réponse non-JSON (proxy, coupure réseau…) : message explicite
+            // selon le statut, jamais de « Erreur 400 » brute.
+            if (err.status === 400 || err.status === 401) {
+              message = "Matricule ou mot de passe incorrect. Vérifiez vos informations.";
+            } else if (err.status === 429) {
+              message = "Trop de tentatives de connexion. Réessayez dans quelques minutes.";
+            } else {
+              message = "Connexion impossible pour le moment. Réessayez dans un instant.";
+            }
+          }
+          fail(message);
           setFormBusy(form, false); // la modale reste active pour réessayer
         });
     });

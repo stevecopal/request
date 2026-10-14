@@ -181,7 +181,9 @@
   /**
    * Remplace le contenu d'un conteneur par un fragment serveur.
    * @param {string} url
-   * @param {{target?: string, pushState?: boolean, onLoaded?: Function}} opts
+   * @param {{target?: string, pushState?: boolean, keepScroll?: boolean, onLoaded?: Function}} opts
+   *   keepScroll : vrai pour un rafraîchissement silencieux (temps réel,
+   *   rechargement de détail après décision) — évite le retour en haut de page.
    */
   function loadFragment(url, opts) {
     opts = opts || {};
@@ -194,8 +196,10 @@
       .then(function (result) {
         target.innerHTML = result.data;
         target.setAttribute("aria-busy", "false");
-        target.focus({ preventScroll: true });
-        window.scrollTo(0, 0);
+        if (opts.keepScroll !== true) {
+          target.focus({ preventScroll: true });
+          window.scrollTo(0, 0);
+        }
 
         if (opts.pushState !== false && url !== window.location.pathname) {
           history.pushState({ fragment: url }, "", url);

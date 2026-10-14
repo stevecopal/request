@@ -1,7 +1,10 @@
 {% load i18n %}
 
-<footer class="bg-navy text-white/75">
-    <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+{# flex-1 : sur un viewport plus haut que le contenu, le footer        #}
+{# absorbe la hauteur restante (voir landing/index.html) — la bande      #}
+{# CTA → footer reste navy d'un bord à l'autre, sans décroche.           #}
+<footer class="landing-bleed flex grow flex-col bg-navy text-white/75">
+    <div class="mt-auto w-full max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
         
 
         {# --- Barre légale --- #}

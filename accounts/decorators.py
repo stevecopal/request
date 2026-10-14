@@ -11,6 +11,7 @@ et rappelant qu'on ne lit **jamais** un identifiant de profil côté client (§9
 from functools import wraps
 
 from django.http import JsonResponse
+from django.shortcuts import redirect, render
 from django.utils.translation import gettext_lazy as _
 
 
@@ -60,6 +61,23 @@ def superuser_required(view):
             return _json_error(_("Authentication required."), 401)
         if not request.user.is_superuser:
             return _json_error(_("Super administrator rights required."), 403)
+        return view(request, *args, **kwargs)
+
+    return wrapper
+
+
+def superuser_page_required(view):
+    """
+    Variante HTML de `superuser_required` pour les pages de la console :
+    anonyme → redirection vers la landing ; mauvais rôle → 403 explicite.
+    """
+
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("accounts:landing")
+        if not request.user.is_superuser:
+            return render(request, "errors/403.html", status=403)
         return view(request, *args, **kwargs)
 
     return wrapper

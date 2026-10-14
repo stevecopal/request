@@ -54,17 +54,33 @@ def apply_status(
     """
     Applique une transition de statut validée et journalise l'entrée d'historique.
 
+    Concurrence : la ligne est re-verrouillée (`select_for_update`) et
+    re-validée dans la transaction — deux décisions simultanées (double-clic,
+    deux onglets) ne peuvent pas produire un état incohérent : la seconde
+    revoit un statut déjà muté et reçoit `StatusTransitionError`.
+
     :param actor: `User` ayant déclenché la transition (None = système).
     :param actor_role: rôle de l'acteur (student/teacher/system).
     :param note: note libre journalisée (ex. motif de rejet).
     :param more_info_request: question posée à l'étudiant (obligatoire sur MORE_INFO).
-    :raises StatusTransitionError: transition invalide ou motif manquant.
+    :raises StatusTransitionError: transition invalide, instance périmée ou motif manquant.
     """
-    allowed = ALLOWED_TRANSITIONS.get(ticket.status, [])
+    # Re-verrouillage + relecture de la vérité terrain dans la transaction.
+    locked = Ticket.objects.select_for_update().get(pk=ticket.pk)
+    if locked.status != ticket.status:
+        raise StatusTransitionError(
+            _(
+                "Cette requête vient d'être mise à jour par une autre action. "
+                "Rechargez son état actuel (%(current)s) avant de recommencer."
+            )
+            % {"current": locked.get_status_display()}
+        )
+
+    allowed = ALLOWED_TRANSITIONS.get(locked.status, [])
     if new_status not in allowed:
         raise StatusTransitionError(
             _("Transition « %(from)s → %(to)s » non autorisée.")
-            % {"from": ticket.get_status_display(), "to": dict(Ticket.Status.choices).get(new_status, new_status)}
+            % {"from": locked.get_status_display(), "to": dict(Ticket.Status.choices).get(new_status, new_status)}
         )
 
     if new_status == Ticket.Status.REJECTED:
@@ -74,9 +90,9 @@ def apply_status(
                 _("Un motif est obligatoire pour rejeter une requête."),
                 {"rejection_reason": _("Champ obligatoire.")},
             )
-        ticket.rejection_reason = reason
+        locked.rejection_reason = reason
     else:
-        ticket.rejection_reason = None
+        locked.rejection_reason = None
 
     if new_status == Ticket.Status.MORE_INFO:
         more_info_request = (more_info_request or reason or "").strip()
@@ -85,23 +101,23 @@ def apply_status(
                 _("Une question est obligatoire pour demander des informations."),
                 {"complementary_info_request": _("Champ obligatoire.")},
             )
-        ticket.complementary_info_request = more_info_request
+        locked.complementary_info_request = more_info_request
     elif new_status == Ticket.Status.PROCESSING:
         # La question reste consultable dans l'historique ; on l'archive à la reprise.
-        ticket.complementary_info_request = ""
+        locked.complementary_info_request = ""
 
-    previous_status = ticket.status
+    previous_status = locked.status
     now = timezone.now()
-    ticket.status = new_status
+    locked.status = new_status
     # Mémorise l'acteur pour le signal post_save (notifications) : le
     # destinataire de l'événement ne reçoit jamais sa propre action.
-    ticket._actor_user_id = getattr(actor, "id", None)
-    if new_status == Ticket.Status.RECEIVED and ticket.received_at is None:
-        ticket.received_at = now
+    locked._actor_user_id = getattr(actor, "id", None)
+    if new_status == Ticket.Status.RECEIVED and locked.received_at is None:
+        locked.received_at = now
     if new_status in (Ticket.Status.RESOLVED, Ticket.Status.REJECTED):
-        ticket.resolved_at = now
+        locked.resolved_at = now
 
-    ticket.save(
+    locked.save(
         update_fields=[
             "status",
             "rejection_reason",
@@ -113,7 +129,7 @@ def apply_status(
     )
 
     TicketStatusHistory.objects.create(
-        ticket=ticket,
+        ticket=locked,
         from_status=previous_status,
         to_status=new_status,
         actor=actor,
@@ -122,4 +138,16 @@ def apply_status(
         or (more_info_request if new_status == Ticket.Status.MORE_INFO else "")
         or str(_("Statut mis à jour.")),
     )
+
+    # Recopie de l'état verrouillé sur l'instance appelante (ergonomie appelant).
+    for field in (
+        "status",
+        "rejection_reason",
+        "complementary_info_request",
+        "received_at",
+        "resolved_at",
+        "updated_at",
+    ):
+        setattr(ticket, field, getattr(locked, field))
+    ticket._actor_user_id = getattr(actor, "id", None)
     return ticket

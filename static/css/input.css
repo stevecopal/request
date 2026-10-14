@@ -241,6 +241,16 @@
            focus-visible:ring-offset-2 focus-visible:ring-offset-navy;
   }
 
+  /* --- Landing : bandes sombres à fond perdu ------------------------ *
+     `html` porte un padding horizontal de 0.5cm (@layer base) : les
+     bandes pleine largeur s'arrêtaient 0.5cm des bords du viewport et
+     cassaient la transition clair → navy. Ce correctif est volontaire-
+     ment limité à la landing (section #acces + footer public).         */
+  .landing-bleed {
+    margin-left: -0.5cm;
+    margin-right: -0.5cm;
+  }
+
   /* --- Carte de requête : rail de statut coloré (signature) ---------- */
   .ticket-card {
     @apply relative bg-white rounded-2xl border border-slate-100 shadow-card

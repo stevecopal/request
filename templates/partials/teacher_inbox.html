@@ -1,59 +1,112 @@
 {% load i18n %}
-{# Boîte enseignant — liste priorisée + panneau de détail.                    #}
-{# Mobile : le détail s'affiche sous la liste. Desktop : deux colonnes (lg).  #}
+{# Boîte enseignant — recherche + filtres + liste priorisée + panneau de détail. #}
+{# Mobile : le détail s'affiche sous la liste. Desktop : deux colonnes (lg).      #}
+{# La liste est rafraîchie en temps réel dans #teacher-ticket-list (fragment     #}
+{# « liste seule ») sans perdre les filtres ni le détail sélectionné.            #}
 <div class="rise space-y-4">
     <div>
         <h2 class="text-xl font-bold text-navy-dark">{% trans "Requêtes à traiter" %}</h2>
-        <p class="text-sm text-slate-500">
-            {{ tickets|length }} {% if tickets|length > 1 %}{% trans "requêtes" %}{% else %}{% trans "requête" %}{% endif %}
-        </p>
+        <p class="text-sm text-slate-500">{% trans "Vos requêtes assignées, prioritaires par ordre d'urgence." %}</p>
     </div>
 
-    <div class="grid gap-6 lg:grid-cols-5 items-start">
-        {# ---- Colonne liste ---- #}
-        <div class="lg:col-span-2">
-            {% if tickets %}
-                <ul class="space-y-3" data-teacher-inbox>
-                    {% for ticket in tickets %}
-                        <li class="rise rise-item">
-                            <button type="button"
-                                    class="ticket-card w-full text-left"
-                                    data-ticket-id="{{ ticket.id }}"
-                                    data-status="{{ ticket.status }}"
-                                    data-ticket-select
-                                    data-detail-url="{% url 'tickets:ticket_detail' ticket.id %}">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <p class="font-semibold text-navy-dark truncate">
-                                            {{ ticket.student.full_name }}
-                                        </p>
-                                        <p class="text-xs text-slate-500 mt-0.5 truncate">
-                                            {{ ticket.problem_type.name }}
-                                            {% if ticket.course %} · {{ ticket.course.code }}{% endif %}
-                                        </p>
-                                    </div>
-                                    {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
-                                </div>
-                                <p class="mt-2 text-xs text-slate-400">{{ ticket.created_at|date:"d/m/Y H:i" }}</p>
-                            </button>
-                        </li>
+    {# ---- Recherche & filtres (soumission sans rechargement de page) ---- #}
+    <form id="inbox-filter" class="card p-4 space-y-3"
+          data-list-url="{% url 'tickets:teacher_inbox_list' %}"
+          data-inbox-url="{% url 'tickets:teacher_inbox' %}">
+        <div class="flex gap-2">
+            <label class="sr-only" for="inbox-q">{% trans "Rechercher" %}</label>
+            <input type="search" id="inbox-q" name="q" class="field"
+                   value="{{ active.q|default:'' }}"
+                   placeholder="{% trans 'Rechercher : étudiant, matricule, UE…' %}">
+            <button type="submit" class="btn btn-primary !w-auto !px-5 shrink-0">
+                {% trans "Filtrer" %}
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div>
+                <label class="label" for="inbox-status">{% trans "Statut" %}</label>
+                <select id="inbox-status" name="status" class="field">
+                    <option value="">{% trans "Tous les statuts" %}</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if active.status == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
                     {% endfor %}
-                </ul>
-            {% else %}
-                <div class="card p-8 text-center">
-                    <span class="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center" aria-hidden="true">
-                        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/>
-                        </svg>
-                    </span>
-                    <p class="mt-4 text-base font-semibold text-navy-dark">
-                        {% trans "Aucune requête en attente." %}
-                    </p>
-                    <p class="mt-1 text-sm text-slate-500">
-                        {% trans "Tout est à jour. Les nouvelles requêtes apparaîtront ici en temps réel." %}
-                    </p>
+                </select>
+            </div>
+            <div>
+                <label class="label" for="inbox-problem-type">{% trans "Motif" %}</label>
+                <select id="inbox-problem-type" name="problem_type" class="field">
+                    <option value="">{% trans "Tous les motifs" %}</option>
+                    {% for problem in problem_types %}
+                        <option value="{{ problem.id }}" {% if active.problem_type == problem.id|stringformat:'s' %}selected{% endif %}>
+                            {{ problem.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="inbox-course">{% trans "Cours autorisé" %}</label>
+                <select id="inbox-course" name="course" class="field">
+                    <option value="">{% trans "Tous mes cours" %}</option>
+                    {% for course in allowed_courses %}
+                        <option value="{{ course.id }}" {% if active.course == course.id|stringformat:'s' %}selected{% endif %}>
+                            {{ course.code }} — {{ course.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="inbox-faculty">{% trans "Faculté" %}</label>
+                <select id="inbox-faculty" name="faculty" class="field">
+                    <option value="">{% trans "Toutes les facultés" %}</option>
+                    {% for faculty in faculties %}
+                        <option value="{{ faculty.id }}" {% if active.faculty == faculty.id|stringformat:'s' %}selected{% endif %}>
+                            {{ faculty.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="inbox-department">{% trans "Département" %}</label>
+                <select id="inbox-department" name="department" class="field">
+                    <option value="">{% trans "Tous les départements" %}</option>
+                    {% for department in departments %}
+                        <option value="{{ department.id }}" {% if active.department == department.id|stringformat:'s' %}selected{% endif %}>
+                            {{ department.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2 sm:col-span-2 lg:col-span-1">
+                <div>
+                    <label class="label" for="inbox-date-from">{% trans "Du" %}</label>
+                    <input type="date" id="inbox-date-from" name="date_from" class="field"
+                           value="{{ active.date_from|default:'' }}">
                 </div>
-            {% endif %}
+                <div>
+                    <label class="label" for="inbox-date-to">{% trans "Au" %}</label>
+                    <input type="date" id="inbox-date-to" name="date_to" class="field"
+                           value="{{ active.date_to|default:'' }}">
+                </div>
+            </div>
+        </div>
+
+        {% if active %}
+            <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                    data-fragment-src="{% url 'tickets:teacher_inbox' %}">
+                {% trans "Réinitialiser les filtres" %}
+            </button>
+        {% endif %}
+    </form>
+
+    <div class="grid gap-6 lg:grid-cols-5 items-start">
+        {# ---- Colonne liste (cible de rafraîchissement temps réel) ---- #}
+        <div class="lg:col-span-2" id="teacher-ticket-list"
+             data-list-url="{% url 'tickets:teacher_inbox_list' %}"
+             data-active-qs="{{ active_qs }}">
+            {% include "partials/teacher_inbox_list.html" %}
         </div>
 
         {# ---- Colonne détail (sticky sur desktop, repli sur mobile) ---- #}

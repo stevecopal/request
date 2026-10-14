@@ -7,10 +7,12 @@ Routage de l'app tickets — namespace « tickets ».
   POST /tickets/ajax/create/           création d'un ticket (étudiant)
   POST /tickets/ajax/reply/            réponse à une demande d'informations
   POST /tickets/ajax/status/           changement de statut (enseignant)
-  GET  /tickets/teacher/               boîte de réception (enseignant)
+  GET  /tickets/teacher/accueil/       tableau de bord enseignant (stats)
+  GET  /tickets/teacher/               boîte de réception (enseignant, filtres)
+  GET  /tickets/teacher/list/          liste seule de la boîte (refresh temps réel)
   GET  /tickets/<uuid:pk>/detail/      détail d'un ticket (propriétaire/enseignant)
   GET  /tickets/<uuid:pk>/suivi/       suivi d'un ticket (étudiant propriétaire)
-  GET  /tickets/attachments/<uuid:pk>/ téléchargement protégé d'une pièce jointe
+  GET  /tickets/attachments/<uuid:pk>/ téléchargement/consultation d'une pièce jointe
 """
 
 from django.urls import path
@@ -27,7 +29,17 @@ urlpatterns = [
     path("ajax/create/", ajax_actions.create_ticket, name="create_ticket"),
     path("ajax/reply/", student_dashboard.student_reply, name="student_reply"),
     path("ajax/status/", status_processor.update_status, name="update_status"),
+    path(
+        "teacher/accueil/",
+        teacher_dashboard.teacher_home,
+        name="teacher_home",
+    ),
     path("teacher/", teacher_dashboard.teacher_inbox, name="teacher_inbox"),
+    path(
+        "teacher/list/",
+        teacher_dashboard.teacher_inbox_list,
+        name="teacher_inbox_list",
+    ),
     path(
         "teacher/decision/",
         teacher_dashboard.teacher_decision_modal,

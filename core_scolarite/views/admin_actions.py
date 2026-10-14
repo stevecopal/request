@@ -8,7 +8,6 @@ détaillées `{status, message, errors:[{line, message}]}`. Accès superuser str
 
 from datetime import date
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
@@ -17,8 +16,8 @@ from django.contrib.auth.models import User
 from django.db import transaction
 
 from accounts.decorators import superuser_required
-from accounts.models import Student, Teacher
 from core_scolarite.forms import ManualAccountForm
+from core_scolarite.services.credentials import set_random_password
 from core_scolarite.services.data_importer import ImportValidationError, import_users
 
 ALLOWED_EXTENSIONS = ("csv", "xlsx")
@@ -97,8 +96,6 @@ def admin_create_account(request):
 
     data = form.cleaned_data
     entity = data["entity"]
-    year = date.today().year
-    pattern = settings.IMPORT_DEFAULT_PASSWORD_PATTERN
 
     with transaction.atomic():
         user = User.objects.create(
@@ -107,10 +104,12 @@ def admin_create_account(request):
             last_name=data["last_name"],
             email=data["email"],
         )
-        user.set_password(pattern.format(matricule=data["matricule"], year=year))
-        user.save(update_fields=["password"])
+        # Jamais de mot de passe par défaut prévisible : aléatoire non communiqué.
+        set_random_password(user)
 
         if entity == "students":
+            from accounts.models import Student
+
             Student.objects.create(
                 user=user,
                 registration_number=data["matricule"],
@@ -118,6 +117,8 @@ def admin_create_account(request):
                 department=data["department"],
             )
         else:
+            from accounts.models import Teacher
+
             Teacher.objects.create(
                 user=user,
                 title=data["title"],

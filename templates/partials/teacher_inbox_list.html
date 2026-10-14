@@ -1,0 +1,88 @@
+{% load i18n %}
+{# Liste des requêtes de la boîte enseignant — fragment rafraîchissable
+   en temps réel (cible #teacher-inbox-list) sans perdre filtres/détail. #}
+{% if tickets %}
+    <p class="text-sm text-slate-500" data-inbox-count>
+        {{ total_count }} {% if total_count > 1 %}{% trans "requêtes" %}{% else %}{% trans "requête" %}{% endif %}
+    </p>
+    <ul class="space-y-3 mt-3" data-teacher-inbox>
+        {% for ticket in tickets %}
+            <li class="rise rise-item">
+                <button type="button"
+                        class="ticket-card w-full text-left"
+                        data-ticket-id="{{ ticket.id }}"
+                        data-status="{{ ticket.status }}"
+                        data-ticket-select
+                        data-detail-url="{% url 'tickets:ticket_detail' ticket.id %}">
+                    <span class="flex items-start justify-between gap-3">
+                        <span class="min-w-0">
+                            <span class="block font-semibold text-navy-dark truncate">
+                                {{ ticket.student.full_name }}
+                            </span>
+                            <span class="block text-xs text-slate-500 mt-0.5 truncate">
+                                {{ ticket.problem_type.name }}
+                                {% if ticket.course %} · {{ ticket.course.code }}{% endif %}
+                            </span>
+                        </span>
+                        {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
+                    </span>
+                    <span class="block mt-2 text-xs text-slate-400">{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
+                </button>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {# Pagination — conserve les filtres actifs (active_qs) #}
+    {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="flex items-center justify-between gap-2 pt-2"
+             aria-label="{% trans 'Pagination des requêtes' %}">
+            {% if page_obj.has_previous %}
+                <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                        data-fragment-src="?{% if active_qs %}{{ active_qs }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">
+                    {% trans "Précédent" %}
+                </button>
+            {% else %}
+                <span></span>
+            {% endif %}
+            <span class="text-xs text-slate-500 tabular-nums">
+                {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </span>
+            {% if page_obj.has_next %}
+                <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                        data-fragment-src="?{% if active_qs %}{{ active_qs }}&amp;{% endif %}page={{ page_obj.next_page_number }}">
+                    {% trans "Suivant" %}
+                </button>
+            {% else %}
+                <span></span>
+            {% endif %}
+        </nav>
+    {% endif %}
+{% else %}
+    <div class="card p-8 text-center">
+        <span class="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center" aria-hidden="true">
+            <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/>
+            </svg>
+        </span>
+        <p class="mt-4 text-base font-semibold text-navy-dark">
+            {% if active %}
+                {% trans "Aucune requête ne correspond à vos filtres." %}
+            {% else %}
+                {% trans "Aucune requête en attente." %}
+            {% endif %}
+        </p>
+        <p class="mt-1 text-sm text-slate-500">
+            {% if active %}
+                {% trans "Réinitialisez les filtres pour retrouver l'ensemble de la boîte." %}
+            {% else %}
+                {% trans "Tout est à jour. Les nouvelles requêtes apparaîtront ici en temps réel." %}
+            {% endif %}
+        </p>
+        {% if active %}
+            <button type="button" class="btn btn-ghost !w-auto px-5 mt-4"
+                    data-fragment-src="{% url 'tickets:teacher_inbox' %}">
+                {% trans "Réinitialiser les filtres" %}
+            </button>
+        {% endif %}
+    </div>
+{% endif %}

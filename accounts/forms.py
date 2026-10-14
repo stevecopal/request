@@ -42,7 +42,9 @@ class LoginForm(forms.Form):
                 self.request, username=matricule.strip(), password=password
             )
             if self.user is None:
-                raise forms.ValidationError(_("Identifiants invalides."))
+                raise forms.ValidationError(
+                    _("Matricule ou mot de passe incorrect. Vérifiez vos informations.")
+                )
             if not self.user.is_active:
                 raise forms.ValidationError(_("Ce compte est désactivé."))
         return cleaned

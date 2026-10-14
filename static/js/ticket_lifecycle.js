@@ -237,6 +237,60 @@
     if (status) status.addEventListener("change", apply);
   }
 
+  /* --------------- BOÎTE ENSEIGNANT : RECHERCHE / FILTRES --------------- */
+
+  /**
+   * Formulaire #inbox-filter : recherche + filtres (statut, motif, faculté,
+   * département, cours, dates). Sérialise tous les champs non vides, recharge
+   * la liste dans #teacher-ticket-list (sans perdre le panneau de détail) et
+   * synchronise l'URL du navigateur (partageable, bouton retour fonctionnel).
+   */
+  function handleInboxFilter(form) {
+    if (form.dataset.wired) return;
+    form.dataset.wired = "1";
+    var listUrl = form.getAttribute("data-list-url");
+    var inboxUrl = form.getAttribute("data-inbox-url") || window.location.pathname;
+
+    function currentQuery() {
+      var params = new URLSearchParams();
+      Array.prototype.forEach.call(
+        form.querySelectorAll("input[name], select[name]"),
+        function (control) {
+          var value = (control.value || "").trim();
+          if (value) params.set(control.name, value);
+        }
+      );
+      return params.toString();
+    }
+
+    function apply() {
+      var query = currentQuery();
+      var container = document.getElementById("teacher-ticket-list");
+      if (container) container.setAttribute("data-active-qs", query);
+      if (listUrl) {
+        api.loadFragment(listUrl + (query ? "?" + query : ""), {
+          target: "#teacher-ticket-list",
+          pushState: false,
+          keepScroll: true,
+        });
+      }
+      // URL navigateur = boîte + filtres (pas l'URL du fragment liste).
+      var pageUrl = inboxUrl + (query ? "?" + query : "");
+      if (pageUrl !== window.location.pathname + window.location.search) {
+        history.pushState({ fragment: pageUrl }, "", pageUrl);
+      }
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      apply();
+    });
+    // Application immédiate sur les listes déroulantes (pas de clic « Filtrer »).
+    Array.prototype.forEach.call(form.querySelectorAll("select"), function (select) {
+      select.addEventListener("change", apply);
+    });
+  }
+
   /* -------------------- NOTIFICATIONS : MARQUAGE « LU » -------------------- */
 
   function updateUnreadBadges(count) {
@@ -280,16 +334,39 @@
 
   /* --------------------------- ENSEIGNANT --------------------------- */
 
-  function loadDetail(url) {
+  function loadDetail(url, opts) {
     var target = document.getElementById("teacher-ticket-detail");
     if (!target) return;
+    opts = opts || {};
     lastDetailUrl = url;
     target.classList.remove("hidden");
-    api.loadFragment(url, { target: "#teacher-ticket-detail", pushState: false });
+    api.loadFragment(url, {
+      target: "#teacher-ticket-detail",
+      pushState: false,
+      keepScroll: opts.keepScroll !== false,
+    });
   }
 
   function refreshDetail() {
     if (lastDetailUrl) loadDetail(lastDetailUrl);
+  }
+
+  /**
+   * Recharge la colonne liste de la boîte enseignant (cible #teacher-ticket-list)
+   * en conservant les filtres actifs (data-active-qs) — pas de retour en haut
+   * de page, panneau de détail intact.
+   */
+  function refreshInboxList() {
+    var container = document.getElementById("teacher-ticket-list");
+    if (!container) return;
+    var url = container.getAttribute("data-list-url");
+    if (!url) return;
+    var qs = container.getAttribute("data-active-qs") || "";
+    api.loadFragment(url + (qs ? "?" + qs : ""), {
+      target: "#teacher-ticket-list",
+      pushState: false,
+      keepScroll: true,
+    });
   }
 
   function submitStatus(button, status, reason, moreInfo) {
@@ -307,6 +384,7 @@
         api.closeModal();
         api.showNotification(result.data.message || "Statut mis à jour.", "success");
         refreshDetail();
+        refreshInboxList();
       })
       .catch(function (err) {
         api.showNotification(
@@ -372,6 +450,8 @@
     }
     var feedFilter = root.querySelector("#feed-filter");
     if (feedFilter) handleFeedFilter(feedFilter);
+    var inboxFilter = root.querySelector("#inbox-filter");
+    if (inboxFilter) handleInboxFilter(inboxFilter);
   }
 
   document.addEventListener("DOMContentLoaded", function () {

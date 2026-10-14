@@ -59,7 +59,7 @@
   }
 
   function handleMessage(payload) {
-    var updated = patchCard(payload);
+    patchCard(payload);
 
     // Badge de navigation : compteur de notifications non lues émis par le
     // signal serveur (uniquement le destinataire concerné le reçoit).
@@ -73,11 +73,41 @@
       "success"
     );
 
-    // Une nouvelle requête débarque dans la boîte enseignant : on rafraîchit.
-    if (payload.created && document.querySelector("[data-teacher-inbox]")) {
-      api.loadFragment("/tickets/teacher/", { target: "#spa-viewport", pushState: false });
-    } else if (!updated) {
-      // La carte n'est pas à l'écran : rien à patcher, la notif suffit.
+    refreshTeacherViews(payload);
+  }
+
+  /**
+   * Boîte enseignant à l'écran : rafraîchit la colonne liste (en conservant
+   * les filtres via data-active-qs) et, si le détail ouvert concerne le ticket
+   * mis à jour, recharge ce détail — sans recharger la page ni perdre l'état.
+   */
+  function refreshTeacherViews(payload) {
+    var list = document.getElementById("teacher-ticket-list");
+    if (list) {
+      var listUrl = list.getAttribute("data-list-url");
+      if (listUrl) {
+        var qs = list.getAttribute("data-active-qs") || "";
+        api.loadFragment(listUrl + (qs ? "?" + qs : ""), {
+          target: "#teacher-ticket-list",
+          pushState: false,
+          keepScroll: true,
+        });
+      }
+    }
+
+    // Détail ouvert sur le ticket concerné (l'URL est sur l'article injecté).
+    var detail = document.querySelector(
+      '#teacher-ticket-detail [data-ticket-id="' + payload.ticket_id + '"]'
+    );
+    if (detail) {
+      var detailUrl = detail.getAttribute("data-detail-url");
+      if (detailUrl) {
+        api.loadFragment(detailUrl, {
+          target: "#teacher-ticket-detail",
+          pushState: false,
+          keepScroll: true,
+        });
+      }
     }
   }
 
@@ -115,6 +145,9 @@
   /* ------------------------------------------------------------------ */
 
   function connect() {
+    // Pages publiques (landing, login) : pas de session, pas de canal temps
+    // réel — évite une boucle de reconnexions refusées (4401) dans la console.
+    if (!spaReady()) return;
     if (!("WebSocket" in window)) {
       startPolling(); // navigateur sans WS : repli polling silencieux
       return;
@@ -144,7 +177,9 @@
     };
 
     socket.onclose = function (event) {
-      if (manuallyClosed || event.code === 4401) return;
+      // 4401/4403 : refus d'authentification côté serveur — inutile de
+      // reconecter (aucune session ne sera créée par une nouvelle tentative).
+      if (manuallyClosed || event.code === 4401 || event.code === 4403) return;
       failedAttempts += 1;
       if (failedAttempts >= MAX_FAILED_ATTEMPTS) startPolling();
       window.setTimeout(connect, reconnectDelay);

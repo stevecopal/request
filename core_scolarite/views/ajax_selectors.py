@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET
 
 from accounts.decorators import student_required
 from accounts.models import Teacher
-from core_scolarite.models import Course, Enrollment, ProblemType
+from core_scolarite.models import ConditionalRule, Course, Enrollment, ProblemType
 
 
 def _teacher_label(title_label, first_name, last_name, username):
@@ -32,11 +32,11 @@ def form_config(request):
             {"status": "error", "message": "problem_type_id requis."}, status=400
         )
 
-    problem_type = (
-        ProblemType.objects.filter(pk=problem_type_id)
-        .only("id", "name", "requires_course", "description")
-        .first()
-    )
+    problem_type = ProblemType.visible_to(student_university := request.student.university).filter(
+        pk=problem_type_id
+    ).only(
+        "id", "name", "requires_course", "description", "university", "is_active", "position"
+    ).first()
     if problem_type is None:
         return JsonResponse(
             {"status": "error", "message": "Type de problème introuvable."}, status=404
@@ -89,8 +89,32 @@ def form_config(request):
     ]
 
     attachments = list(
-        problem_type.required_attachments.values("id", "label", "is_required")
+        problem_type.required_attachments.values(
+            "id", "label", "is_required", "allowed_types", "max_size_mb"
+        )
     )
+
+    # Champs dynamiques + règles conditionnelles (rendus côté client,
+    # réévalués côté serveur à la soumission).
+    fields = list(
+        problem_type.fields.filter(is_active=True)
+        .order_by("position", "id")
+        .values("key", "label", "field_type", "is_required", "help_text", "choices_list")
+    )
+    for field in fields:
+        field["choices"] = [
+            line.strip()
+            for line in (field.pop("choices_list") or "").splitlines()
+            if line.strip()
+        ]
+    rules = list(
+        ConditionalRule.objects.filter(field__problem_type=problem_type)
+        .order_by("field__position", "id")
+        .values("field__key", "depends_on__key", "operator", "value", "action")
+    )
+    for rule in rules:
+        rule["field"] = rule.pop("field__key")
+        rule["depends_on"] = rule.pop("depends_on__key")
 
     return JsonResponse(
         {
@@ -105,6 +129,8 @@ def form_config(request):
             "courses": courses,
             "teachers": teachers,
             "attachments": attachments,
+            "fields": fields,
+            "rules": rules,
         }
     )
 
@@ -112,8 +138,10 @@ def form_config(request):
 @require_GET
 @student_required
 def problem_types(request):
-    """Liste des types de problème disponibles (remplissage du menu déroulant)."""
+    """Liste des types de requête **actifs et visibles** pour l'université de l'étudiant."""
     data = list(
-        ProblemType.objects.values("id", "name", "requires_course").order_by("name")
+        ProblemType.visible_to(request.student.university)
+        .values("id", "name", "requires_course")
+        .order_by("position", "name")
     )
     return JsonResponse({"status": "success", "problem_types": data})

@@ -16,6 +16,9 @@ class TicketStatusHistoryInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
+    def has_change_permission(self, request, obj=None):
+        return False
+
 
 class TicketAttachmentInline(admin.TabularInline):
     model = TicketAttachment
@@ -60,6 +63,11 @@ class TicketStatusHistoryAdmin(admin.ModelAdmin):
     readonly_fields = [f.name for f in TicketStatusHistory._meta.fields]
 
     def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Journal immuable : lecture seule, y compris pour le super-admin
+        # (les entrées ne sont créées que par les services métier).
         return False
 
     def has_delete_permission(self, request, obj=None):

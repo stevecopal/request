@@ -3,8 +3,14 @@ Traitement des statuts — tickets (ARCHITECTURE §7.3, Prompt 15).
 
 Sécurité : un enseignant ne peut faire muter QUE les tickets qui lui sont
 assignés → sinon 403 Forbidden. Un rejet sans motif est refusé (400).
+La demande d'informations complémentaires (MORE_INFO) est soumise au feature
+flag `ENABLE_TEACHER_MORE_INFO` (désactivé → 400, jamais d'effet de bord).
+La transition réelle passe par `apply_status` qui re-verrouille la ligne
+(`select_for_update`) : deux décisions concurrentes ne peuvent pas se
+marcher dessus.
 """
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
@@ -26,6 +32,17 @@ def update_status(request):
     if not ticket_id or not new_status:
         return JsonResponse(
             {"status": "error", "message": str(_("Paramètres manquants."))}, status=400
+        )
+
+    if new_status == Ticket.Status.MORE_INFO and not settings.ENABLE_TEACHER_MORE_INFO:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": str(
+                    _("La demande d'informations complémentaires est désactivée.")
+                ),
+            },
+            status=400,
         )
 
     ticket = Ticket.objects.filter(pk=ticket_id).first()

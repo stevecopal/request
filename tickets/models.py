@@ -11,6 +11,7 @@ TicketStatusHistory : journal horodaté de chaque changement de statut/décision
 import uuid
 from datetime import date
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -90,6 +91,16 @@ class Ticket(UUIDModel):
     # temps de réponse moyen par faculté (updated_at change à chaque mutation).
     received_at = models.DateTimeField(_("received at"), null=True, blank=True)
     resolved_at = models.DateTimeField(_("resolved at"), null=True, blank=True)
+    # Snapshot de la configuration du formulaire au moment de la soumission :
+    # une modification ultérieure du type (champs, pièces, règles) ne déforme
+    # jamais l'historique des requêtes existantes.
+    config_snapshot = models.JSONField(
+        _("configuration à la soumission"), default=dict, blank=True
+    )
+    # Réponses aux champs dynamiques du formulaire (validées côté serveur).
+    form_data = models.JSONField(
+        _("réponses au formulaire"), default=dict, blank=True
+    )
 
     class Meta:
         verbose_name = _("ticket")
@@ -188,6 +199,17 @@ class TicketAttachment(UUIDModel):
         verbose_name_plural = _("ticket attachments")
         ordering = ["config__label"]
 
+    @property
+    def file_extension(self) -> str:
+        """Extension lisible du fichier stocké (le nom sert jamais de chemin client)."""
+        name = self.file.name or ""
+        return name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+    @property
+    def is_image(self) -> bool:
+        """True pour les pièces consultables en image (aperçu inline protégé)."""
+        return self.file_extension in {"png", "jpg", "jpeg", "webp"}
+
     def __str__(self):
         return f"{self.config.label} — {self.ticket.short_id}"
 
@@ -245,6 +267,27 @@ class TicketStatusHistory(UUIDModel):
                 fields=["ticket", "created_at"], name="tsh_ticket_created_idx"
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        """
+        Journal immuable pour les utilisateurs ordinaires (§6/§9) : une entrée
+        créée ne peut plus être modifiée. Le flag `_allow_history_mutation`
+        est réservé aux opérations système/administratives rares et explicites.
+        """
+        if not self._state.adding and not getattr(
+            self, "_allow_history_mutation", False
+        ):
+            raise ValidationError(
+                _("L'historique des statuts est immuable : modification refusée.")
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if not getattr(self, "_allow_history_mutation", False):
+            raise ValidationError(
+                _("L'historique des statuts est immuable : suppression refusée.")
+            )
+        return super().delete(*args, **kwargs)
 
     @property
     def from_status_label(self) -> str:

@@ -81,7 +81,13 @@ def login_view(request):
     form = LoginForm(request=request, data=request.POST)
     if not form.is_valid():
         attempts = _register_failure(request)
-        message = form.errors.get("__all__", [_("Données invalides.")])[0]
+        # Message explicite : « Identifiants invalides. » si échec d'authentification,
+        # sinon (champ vide) consigne de saisie — jamais de « Données invalides. ».
+        message = form.errors.get("__all__", [None])[0]
+        if message is None:
+            message = _(
+                "Matricule et mot de passe sont requis. Saisissez vos deux identifiants."
+            )
         return _error(message, status=400, attempts=attempts)
 
     user = form.user

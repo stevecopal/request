@@ -17,7 +17,10 @@
 
     {% include "components/public_navbar.html" %}
 
-    <main id="spa-viewport" class="flex-1" tabindex="-1">
+    {# Pas de flex-1 ici : c'est le footer (navy) qui absorbe la hauteur   #}
+    {# restante sur un viewport plus haut que le contenu — la bande CTA →   #}
+    {# footer reste donc continue, sans zone claire intercalaire.           #}
+    <main id="spa-viewport" tabindex="-1">
 
         {# ==================== A — HERO ==================== #}
         <section id="accueil" class="hero-surface scroll-mt-20 border-b border-slate-100">
@@ -257,7 +260,7 @@
         </section>
 
         {# ==================== C — APPEL À L'ACTION FINAL ==================== #}
-        <section id="acces" class="scroll-mt-20 bg-navy">
+        <section id="acces" class="landing-bleed scroll-mt-20 bg-navy">
             <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20 text-center">
                 <h2 class="mx-auto max-w-2xl text-2xl font-extrabold tracking-tight text-white
                            break-words sm:text-3xl lg:text-4xl">

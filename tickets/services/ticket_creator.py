@@ -18,8 +18,19 @@ from django.conf import settings
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
-from accounts.models import Teacher
-from core_scolarite.models import AttachmentConfig, Course, Enrollment, ProblemType
+from accounts.models import AcademicYear, Teacher
+from core_scolarite.models import (
+    AttachmentConfig,
+    Course,
+    CourseAssignment,
+    Enrollment,
+    ProblemType,
+)
+from core_scolarite.services.form_config import (
+    ConfigurationError,
+    build_snapshot,
+    validate_dynamic_fields,
+)
 from tickets.models import Ticket, TicketAttachment, TicketStatusHistory
 
 
@@ -52,7 +63,7 @@ def _validate_file(uploaded_file, label):
         )
 
 
-def _resolve_teacher(student_profile, problem_type, course, teacher_id):
+def _resolve_teacher(student_profile, problem_type, course, teacher_id, academic_year=""):
     if problem_type.requires_course:
         if course is None:
             raise TicketCreationError(
@@ -73,7 +84,14 @@ def _resolve_teacher(student_profile, problem_type, course, teacher_id):
             raise TicketCreationError(
                 _("L'unité d'enseignement sélectionnée n'appartient pas à votre département.")
             )
-        teacher = course.primary_instructor
+        # Responsable automatique : affectation enseignant → cours active pour
+        # l'année académique (puis repli sur le primary_instructor historique).
+        year_object = None
+        if academic_year:
+            year_object = AcademicYear.objects.filter(code=academic_year).first()
+        teacher = CourseAssignment.responsible(course, year_object)
+        if teacher is None:
+            teacher = course.primary_instructor
         if teacher is None:
             raise TicketCreationError(
                 _("Aucun enseignant n'est assigné à cette unité d'enseignement.")
@@ -112,6 +130,7 @@ def create_student_ticket(
     course_id=None,
     teacher_id=None,
     academic_year="",
+    form_data=None,
 ) -> Ticket:
     """
     Crée un ticket pour l'étudiant fourni.
@@ -123,6 +142,7 @@ def create_student_ticket(
     :param course_id: id de l'UE (si le problème l'exige).
     :param teacher_id: id de l'enseignant (si le problème n'exige pas d'UE).
     :param academic_year: session académique déclarée (ex. 2025-2026).
+    :param form_data: réponses aux champs dynamiques (validées côté serveur).
     :return: le Ticket créé.
     :raises TicketCreationError: validation échouée (aucune écriture persistée).
     """
@@ -135,12 +155,37 @@ def create_student_ticket(
     problem_type = ProblemType.objects.filter(pk=problem_type_id).first()
     if problem_type is None:
         raise TicketCreationError(_("Type de problème introuvable."))
+    # Activation + isolation universitaire : un type désactivé ou rattaché à une
+    # autre université n'est jamais soumissible (contrôle serveur).
+    if not problem_type.is_active:
+        raise TicketCreationError(_("Ce type de requête n'est plus disponible."))
+    student_university = student_profile.university
+    if (
+        problem_type.university_id
+        and student_university is not None
+        and problem_type.university_id != student_university.pk
+    ):
+        raise TicketCreationError(
+            _("Ce type de requête n'est pas disponible dans votre université.")
+        )
+
+    # Réponses aux champs dynamiques : obligatoires + règles conditionnelles.
+    try:
+        answers = validate_dynamic_fields(problem_type, form_data)
+    except ConfigurationError as exc:
+        raise TicketCreationError(
+            _("Certains champs du formulaire sont invalides : %(details)s.")
+            % {"details": " ".join(exc.errors)},
+            {"form": " ".join(exc.errors)},
+        )
 
     course = None
     if course_id:
         course = Course.objects.filter(pk=course_id).first()
 
-    teacher = _resolve_teacher(student_profile, problem_type, course, teacher_id)
+    teacher = _resolve_teacher(
+        student_profile, problem_type, course, teacher_id, academic_year
+    )
 
     configs = list(
         AttachmentConfig.objects.filter(problem_type=problem_type).order_by("label")
@@ -173,6 +218,10 @@ def create_student_ticket(
         description=description,
         academic_year=(academic_year or "").strip()[:9],
         status=Ticket.Status.SENT,
+        # Figer la configuration utilisée : les modifications ultérieures du
+        # type ne déforment jamais l'historique de cette requête.
+        config_snapshot=build_snapshot(problem_type),
+        form_data=answers,
     )
     # L'étudiant est l'acteur : il ne reçoit pas de notification pour sa propre
     # soumission (posé avant save pour le signal post_save).

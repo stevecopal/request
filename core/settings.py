@@ -169,6 +169,12 @@ IMPORT_DEFAULT_PASSWORD_PATTERN = config(
     "IMPORT_DEFAULT_PASSWORD_PATTERN", default="{matricule}Univ!{year}"
 )
 
+# Feature flag espace enseignant : demande d'informations complémentaires
+# (transition MORE_INFO). Désactivable par environnement sans toucher au code.
+ENABLE_TEACHER_MORE_INFO = config(
+    "ENABLE_TEACHER_MORE_INFO", default=True, cast=bool
+)
+
 # --------------------------------------------------------------------------- #
 # Web Push (notifications hors-page, distinctes des WebSockets) — §10
 # Clés VAPID : si absentes, le push est désactivé proprement (best-effort).

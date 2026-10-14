@@ -45,7 +45,7 @@ def role_dashboard_url(role):
     """Fragment initial du dashboard selon le rôle (clé d'URL reverse)."""
     return {
         ROLE_STUDENT: "tickets:student_home",
-        ROLE_TEACHER: "tickets:teacher_inbox",
+        ROLE_TEACHER: "tickets:teacher_home",
         ROLE_ADMIN: "core_scolarite:admin_analytics",
     }.get(role)
 
@@ -90,6 +90,9 @@ def nav_items(role, unread_notifications=0):
             )
         )
     elif role == ROLE_TEACHER:
+        items.append(
+            _item(_("Accueil"), reverse("tickets:teacher_home"), "home")
+        )
         items.append(
             _item(_("À traiter"), reverse("tickets:teacher_inbox"), "inbox")
         )
