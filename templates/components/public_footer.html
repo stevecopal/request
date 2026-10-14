@@ -1,78 +1,12 @@
 {% load i18n %}
-{# ==================================================================== #}
-{# Pied de page public — réutilisé par les pages publiques.             #}
-{# Fond navy (token de marque), contraste AA vérifié :                  #}
-{# texte blanc/70-75 sur #1E3A8A. Les liens portent un focus blanc.     #}
-{# `#contact` : destination réelle du lien « Contact » de la navbar.    #}
-{# ==================================================================== #}
+
 <footer class="bg-navy text-white/75">
-    <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-
-            {# --- Marque --- #}
-            <div>
-                <div class="flex items-center gap-2.5">
-                    <span class="brand-mark !bg-white/15 !shadow-none" aria-hidden="true">
-                        <svg class="w-6 h-6 text-white" viewBox="0 0 32 32" fill="none">
-                            <path d="M16 7 5 12.5 16 18l11-5.5L16 7Z" fill="currentColor"/>
-                        </svg>
-                    </span>
-                    <span class="text-lg font-extrabold tracking-tight text-white">
-                        {% trans "UnivReq" %}
-                    </span>
-                </div>
-                <p class="mt-3 max-w-xs text-sm leading-relaxed text-white/70">
-                    {% trans "Portail universitaire de soumission et de suivi des requêtes académiques." %}
-                </p>
-            </div>
-
-            {# --- Navigation de section --- #}
-            <nav aria-labelledby="footer-nav-title">
-                <h2 id="footer-nav-title" class="text-sm font-semibold text-white">
-                    {% trans "Navigation" %}
-                </h2>
-                <ul class="mt-3 space-y-1">
-                    <li><a class="public-footer__link" href="#accueil">{% trans "Accueil" %}</a></li>
-                    <li><a class="public-footer__link" href="#fonctionnalites">{% trans "Fonctionnalités" %}</a></li>
-                    <li><a class="public-footer__link" href="#fonctionnement">{% trans "Fonctionnement" %}</a></li>
-                    <li><a class="public-footer__link" href="#securite">{% trans "Sécurité" %}</a></li>
-                </ul>
-            </nav>
-
-            {# --- Accès au portail (route réelle de connexion) --- #}
-            <div>
-                <h2 class="text-sm font-semibold text-white">
-                    {% trans "Portail" %}
-                </h2>
-                <a href="{% url 'accounts:login_page' %}"
-                   class="btn btn-auto mt-3 bg-white px-5 text-sm text-navy shadow-md
-                          hover:bg-navy-50 active:scale-95
-                          focus-visible:ring-white focus-visible:ring-offset-navy"
-                   data-modal-src="{% url 'accounts:login_page' %}"
-                   data-modal-title="{% trans 'Connexion' %}">
-                    {% trans "Accéder au portail" %}
-                </a>
-                <p class="mt-3 text-xs leading-relaxed text-white/60">
-                    {% trans "Identifiants gérés par le portail central de l'université." %}
-                </p>
-            </div>
-
-            {# --- Contact : destination du lien « Contact » de la navbar --- #}
-            <div id="contact" class="scroll-mt-24">
-                <h2 class="text-sm font-semibold text-white">
-                    {% trans "Contact" %}
-                </h2>
-                <p class="mt-3 text-sm leading-relaxed text-white/70">
-                    {% trans "Pour toute question relative à vos démarches, rapprochez-vous du service de scolarité de votre établissement." %}
-                </p>
-            </div>
-        </div>
+    <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+        
 
         {# --- Barre légale --- #}
-        <div class="mt-10 flex flex-col items-center justify-between gap-2
-                    border-t border-white/10 pt-6 text-xs text-white/70 sm:flex-row">
-            <p>© {% now "Y" %} {% trans "UnivReq — Tous droits réservés." %}</p>
-            <p>{% trans "Portail de gestion des requêtes universitaires." %}</p>
+        <div class=" text-white/70 sm:mt-10">
+            <p>&copy; {% now "Y" %} {% trans "UnivReq — Tous droits réservés." %}</p>
         </div>
     </div>
 </footer>

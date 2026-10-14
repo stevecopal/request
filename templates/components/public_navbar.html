@@ -14,14 +14,8 @@
         <div class="flex h-16 items-center gap-3">
             {# --- Marque --- #}
             <a href="{% url 'accounts:landing' %}" class="flex shrink-0 items-center gap-2.5 rounded-lg">
-                <span class="brand-mark" aria-hidden="true">
-                    <svg class="w-6 h-6 text-white" viewBox="0 0 32 32" fill="none">
-                        <path d="M16 7 5 12.5 16 18l11-5.5L16 7Z" fill="currentColor"/>
-                        <path d="M9 15.5v4.2c0 1.6 3.1 3.3 7 3.3s7-1.7 7-3.3v-4.2"
-                              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </span>
-                <span class="text-lg font-extrabold tracking-tight text-navy">
+                
+                <span class="text-lg font-extrabold tracking-tight text-navy-500">
                     {% trans "UnivReq" %}
                 </span>
             </a>
@@ -31,8 +25,6 @@
                  aria-label="{% trans 'Navigation principale' %}">
                 <a class="public-nav__link" href="#accueil">{% trans "Accueil" %}</a>
                 <a class="public-nav__link" href="#fonctionnalites">{% trans "Fonctionnalités" %}</a>
-                <a class="public-nav__link" href="#fonctionnement">{% trans "Fonctionnement" %}</a>
-                <a class="public-nav__link" href="#securite">{% trans "Sécurité" %}</a>
             </nav>
 
             {# --- Actions (masquées sous sm : le CTA vit dans le panneau) --- #}
@@ -74,8 +66,6 @@
             <nav class="flex flex-col gap-1" aria-label="{% trans 'Navigation mobile' %}">
                 <a class="public-nav__link public-nav__link--mobile" href="#accueil">{% trans "Accueil" %}</a>
                 <a class="public-nav__link public-nav__link--mobile" href="#fonctionnalites">{% trans "Fonctionnalités" %}</a>
-                <a class="public-nav__link public-nav__link--mobile" href="#fonctionnement">{% trans "Fonctionnement" %}</a>
-                <a class="public-nav__link public-nav__link--mobile" href="#securite">{% trans "Sécurité" %}</a>
             </nav>
             <a href="{% url 'accounts:login_page' %}"
                class="btn btn-primary mt-3"

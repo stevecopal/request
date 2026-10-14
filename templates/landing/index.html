@@ -10,8 +10,7 @@
 {# Landing publique — layout : navbar (include) + sections + footer.     #}
 {# Chaque section est une bande pleine largeur avec un conteneur         #}
 {# max-w-shell : pas de marges négatives, alignement constant partout.   #}
-{# Ancres : #accueil #fonctionnalites #fonctionnement #securite         #}
-{#          (#contact vit dans le footer).                              #}
+{# Ancres : #accueil #fonctionnalites (#contact vit dans le footer).    #}
 {# ==================================================================== #}
 {% block layout %}
 <div class="flex min-h-screen flex-col">
@@ -21,54 +20,48 @@
     <main id="spa-viewport" class="flex-1" tabindex="-1">
 
         {# ==================== A — HERO ==================== #}
-        <section id="accueil" class="scroll-mt-20 border-b border-slate-100 bg-white">
-            <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
+        <section id="accueil" class="hero-surface scroll-mt-20 border-b border-slate-100">
+            <div class="relative max-w-shell mx-auto px-4 sm:px-6 lg:px-8
+                        py-14 sm:py-20 lg:py-28">
                 <div class="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
 
                     {# --- Colonne texte --- #}
-                    <div class="animate-rise">
-                        <p class="flex items-center gap-3 text-xs font-semibold uppercase
-                                   tracking-widest text-navy">
-                            <span class="h-px w-8 shrink-0 bg-navy-600" aria-hidden="true"></span>
-                            <span>{% trans "Portail de gestion des requêtes universitaires" %}</span>
-                        </p>
+                    <div class="animate-rise text-center lg:text-left">
+                        
 
-                        <h1 class="mt-4 text-3xl font-extrabold leading-[1.15] tracking-tight
-                                   text-navy-dark sm:text-4xl">
-                            {% trans "Vos démarches universitaires, plus simples et plus transparentes." %}
+                        <h1 class="mt-5 text-[1.9rem] font-extrabold leading-[1.08]
+                                   tracking-tight text-navy-dark break-words
+                                   sm:text-5xl lg:mt-6 lg:text-6xl">
+                            {% trans "Vos démarches universitaires," %}
+                            <span class="block text-navy-600">
+                                {% trans "plus simples et plus transparentes." %}
+                            </span>
                         </h1>
 
-                        <p class="mt-4 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+                        <p class="mt-5 max-w-xl text-base leading-relaxed text-slate-600
+                                  mx-auto sm:text-lg lg:mx-0 lg:mt-6">
                             {% trans "Déposez vos demandes, joignez les justificatifs nécessaires et suivez leur traitement depuis un espace unique, conçu pour les étudiants, les enseignants et l'administration." %}
                         </p>
 
-                        <div class="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div class="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center
+                                    sm:justify-center lg:mt-9 lg:justify-start">
                             <a href="{% url 'accounts:login_page' %}"
                                class="btn btn-primary btn-auto"
                                data-modal-src="{% url 'accounts:login_page' %}"
                                data-modal-title="{% trans 'Connexion' %}">
                                 {% trans "Accéder au portail" %}
                             </a>
-                            <a href="#fonctionnement" class="btn btn-ghost btn-auto">
-                                {% trans "Découvrir le fonctionnement" %}
+                            <a href="#fonctionnalites" class="btn btn-ghost btn-auto">
+                                {% trans "Découvrir les fonctionnalités" %}
                             </a>
                         </div>
 
-                        <p class="mt-6 flex items-start gap-2.5 border-t border-slate-100
-                                  pt-5 text-sm leading-relaxed text-slate-500">
-                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2"
-                                 stroke-linecap="round" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 16v-4"/><path d="M12 8h.01"/>
-                            </svg>
-                            <span>{% trans "La gestion des identifiants est centralisée sur le portail de l'université." %}</span>
-                        </p>
+                                                </p>
                     </div>
 
                     {# --- Aperçu produit (illustratif, composants existants) --- #}
                     <figure class="animate-rise">
-                        <div class="card p-5 shadow-card-hover sm:p-6">
+                        <div class="card p-4 shadow-card-hover sm:p-6">
                             <div class="flex items-center justify-between gap-3
                                         border-b border-slate-100 pb-4">
                                 <div class="min-w-0">
@@ -130,9 +123,7 @@
                                 </li>
                             </ul>
                         </div>
-                        <figcaption class="mt-3 text-center text-xs text-slate-500">
-                            {% trans "Aperçu illustratif de l'espace étudiant — données d'exemple." %}
-                        </figcaption>
+                        
                     </figure>
                 </div>
             </div>
@@ -142,7 +133,9 @@
         <section id="fonctionnalites" class="scroll-mt-20 bg-background">
             <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20">
                 <div class="max-w-2xl">
-                    <h2 class="text-2xl font-bold tracking-tight text-navy-dark sm:text-3xl">
+                    
+                    <h2 class="mt-4 text-2xl font-extrabold tracking-tight text-navy-dark
+                               break-words sm:text-3xl lg:text-4xl">
                         {% trans "Fonctionnalités" %}
                     </h2>
                     <p class="mt-3 text-base leading-relaxed text-slate-600 sm:text-lg">
@@ -150,10 +143,10 @@
                     </p>
                 </div>
 
-                <div class="mt-10 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="mt-8 grid gap-4 sm:mt-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
                     {# 1 — Dépôt simplifié #}
-                    <div class="border-t border-slate-200 pt-5">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
+                    <article class="card card-hover p-5 sm:p-6">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl
                                      bg-navy-50 text-navy" aria-hidden="true">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -161,34 +154,34 @@
                                 <path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/>
                             </svg>
                         </span>
-                        <h3 class="mt-4 text-base font-bold text-navy-dark">
+                        <h3 class="mt-4 text-base font-bold text-navy-dark sm:text-lg">
                             {% trans "Dépôt simplifié" %}
                         </h3>
                         <p class="mt-2 text-sm leading-relaxed text-slate-600">
                             {% trans "Soumettez vos demandes en quelques minutes grâce à des formulaires configurés pour chaque motif." %}
                         </p>
-                    </div>
+                    </article>
 
                     {# 2 — Pièces jointes dynamiques #}
-                    <div class="border-t border-slate-200 pt-5">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
+                    <article class="card card-hover p-5 sm:p-6">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl
                                      bg-navy-50 text-navy" aria-hidden="true">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                             </svg>
                         </span>
-                        <h3 class="mt-4 text-base font-bold text-navy-dark">
+                        <h3 class="mt-4 text-base font-bold text-navy-dark sm:text-lg">
                             {% trans "Pièces jointes dynamiques" %}
                         </h3>
                         <p class="mt-2 text-sm leading-relaxed text-slate-600">
                             {% trans "Les justificatifs requis s'adaptent au type de demande : votre dossier est complet dès sa soumission." %}
                         </p>
-                    </div>
+                    </article>
 
                     {# 3 — Affectation automatique #}
-                    <div class="border-t border-slate-200 pt-5 sm:col-span-2 lg:col-span-1">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
+                    <article class="card card-hover p-5 sm:p-6 sm:col-span-2 lg:col-span-1">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl
                                      bg-navy-50 text-navy" aria-hidden="true">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -197,34 +190,34 @@
                                 <path d="m17 11 2 2 4-4"/>
                             </svg>
                         </span>
-                        <h3 class="mt-4 text-base font-bold text-navy-dark">
+                        <h3 class="mt-4 text-base font-bold text-navy-dark sm:text-lg">
                             {% trans "Affectation automatique" %}
                         </h3>
                         <p class="mt-2 text-sm leading-relaxed text-slate-600">
                             {% trans "Votre demande rejoint directement l'enseignant responsable, selon les affectations de cours configurées par l'administration." %}
                         </p>
-                    </div>
+                    </article>
 
                     {# 4 — Suivi du statut #}
-                    <div class="border-t border-slate-200 pt-5">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
+                    <article class="card card-hover p-5 sm:p-6">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl
                                      bg-navy-50 text-navy" aria-hidden="true">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
                             </svg>
                         </span>
-                        <h3 class="mt-4 text-base font-bold text-navy-dark">
+                        <h3 class="mt-4 text-base font-bold text-navy-dark sm:text-lg">
                             {% trans "Suivi du statut et historique" %}
                         </h3>
                         <p class="mt-2 text-sm leading-relaxed text-slate-600">
                             {% trans "Consultez l'évolution de chaque demande et l'historique de ses étapes, jusqu'à la décision finale." %}
                         </p>
-                    </div>
+                    </article>
 
                     {# 5 — Notifications #}
-                    <div class="border-t border-slate-200 pt-5">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
+                    <article class="card card-hover p-5 sm:p-6">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl
                                      bg-navy-50 text-navy" aria-hidden="true">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -232,17 +225,17 @@
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                             </svg>
                         </span>
-                        <h3 class="mt-4 text-base font-bold text-navy-dark">
+                        <h3 class="mt-4 text-base font-bold text-navy-dark sm:text-lg">
                             {% trans "Notifications de mise à jour" %}
                         </h3>
                         <p class="mt-2 text-sm leading-relaxed text-slate-600">
                             {% trans "Recevez une alerte à chaque changement de statut pour ne rien manquer du traitement de vos demandes." %}
                         </p>
-                    </div>
+                    </article>
 
                     {# 6 — Espaces dédiés #}
-                    <div class="border-t border-slate-200 pt-5">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
+                    <article class="card card-hover p-5 sm:p-6">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl
                                      bg-navy-50 text-navy" aria-hidden="true">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -252,324 +245,25 @@
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                             </svg>
                         </span>
-                        <h3 class="mt-4 text-base font-bold text-navy-dark">
+                        <h3 class="mt-4 text-base font-bold text-navy-dark sm:text-lg">
                             {% trans "Espaces dédiés" %}
                         </h3>
                         <p class="mt-2 text-sm leading-relaxed text-slate-600">
                             {% trans "Un espace adapté à chaque rôle : étudiant, enseignant et administration." %}
                         </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        {# ==================== C — FONCTIONNEMENT ==================== #}
-        <section id="fonctionnement" class="scroll-mt-20 bg-white">
-            <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20">
-                <div class="max-w-2xl">
-                    <h2 class="text-2xl font-bold tracking-tight text-navy-dark sm:text-3xl">
-                        {% trans "Comment ça fonctionne" %}
-                    </h2>
-                    <p class="mt-3 text-base leading-relaxed text-slate-600 sm:text-lg">
-                        {% trans "Quatre étapes, de la connexion à la décision finale." %}
-                    </p>
-                </div>
-
-                <ol class="mt-10 grid gap-8 lg:grid-cols-4 lg:gap-6">
-                    {# Étape 1 — mobile : cercle + texte en ligne (pas de trait traversant) #}
-                    <li class="relative flex gap-4 lg:block">
-                        <span class="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center
-                                     rounded-full border border-navy-100 bg-navy-50
-                                     text-sm font-bold tabular-nums text-navy" aria-hidden="true">1</span>
-                        <span class="absolute left-5 top-10 -bottom-8 w-px bg-slate-200
-                                     lg:hidden" aria-hidden="true"></span>
-                        <span class="absolute left-10 right-[-1.5rem] top-5 hidden h-px
-                                     bg-slate-200 lg:block" aria-hidden="true"></span>
-                        <div class="min-w-0 lg:mt-4">
-                            <h3 class="text-base font-bold text-navy-dark">
-                                {% trans "Connectez-vous à votre espace." %}
-                            </h3>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                                {% trans "Avec votre matricule et vos identifiants universitaires." %}
-                            </p>
-                        </div>
-                    </li>
-
-                    {# Étape 2 #}
-                    <li class="relative flex gap-4 lg:block">
-                        <span class="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center
-                                     rounded-full border border-navy-100 bg-navy-50
-                                     text-sm font-bold tabular-nums text-navy" aria-hidden="true">2</span>
-                        <span class="absolute left-5 top-10 -bottom-8 w-px bg-slate-200
-                                     lg:hidden" aria-hidden="true"></span>
-                        <span class="absolute left-10 right-[-1.5rem] top-5 hidden h-px
-                                     bg-slate-200 lg:block" aria-hidden="true"></span>
-                        <div class="min-w-0 lg:mt-4">
-                            <h3 class="text-base font-bold text-navy-dark">
-                                {% trans "Sélectionnez le motif et remplissez le formulaire." %}
-                            </h3>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                                {% trans "Le formulaire s'adapte au motif choisi : seules les informations utiles sont demandées." %}
-                            </p>
-                        </div>
-                    </li>
-
-                    {# Étape 3 #}
-                    <li class="relative flex gap-4 lg:block">
-                        <span class="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center
-                                     rounded-full border border-navy-100 bg-navy-50
-                                     text-sm font-bold tabular-nums text-navy" aria-hidden="true">3</span>
-                        <span class="absolute left-5 top-10 -bottom-8 w-px bg-slate-200
-                                     lg:hidden" aria-hidden="true"></span>
-                        <span class="absolute left-10 right-[-1.5rem] top-5 hidden h-px
-                                     bg-slate-200 lg:block" aria-hidden="true"></span>
-                        <div class="min-w-0 lg:mt-4">
-                            <h3 class="text-base font-bold text-navy-dark">
-                                {% trans "Ajoutez les justificatifs requis et soumettez votre demande." %}
-                            </h3>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                                {% trans "Les pièces à joindre sont indiquées pour chaque motif." %}
-                            </p>
-                        </div>
-                    </li>
-
-                    {# Étape 4 — dernière : pas de connecteur #}
-                    <li class="relative flex gap-4 lg:block">
-                        <span class="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center
-                                     rounded-full border border-navy-100 bg-navy-50
-                                     text-sm font-bold tabular-nums text-navy" aria-hidden="true">4</span>
-                        <div class="min-w-0 lg:mt-4">
-                            <h3 class="text-base font-bold text-navy-dark">
-                                {% trans "Suivez son traitement jusqu'à la décision finale." %}
-                            </h3>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                                {% trans "Statuts, notifications et historique restent consultables dans votre espace." %}
-                            </p>
-                        </div>
-                    </li>
-                </ol>
-            </div>
-        </section>
-
-        {# ==================== D — ESPACES PAR RÔLE ==================== #}
-        <section id="roles" class="scroll-mt-20 bg-background">
-            <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20">
-                <div class="max-w-2xl">
-                    <h2 class="text-2xl font-bold tracking-tight text-navy-dark sm:text-3xl">
-                        {% trans "Trois espaces, un seul portail" %}
-                    </h2>
-                    <p class="mt-3 text-base leading-relaxed text-slate-600 sm:text-lg">
-                        {% trans "Chaque acteur dispose d'un espace pensé pour son rôle, avec les seules permissions dont il a besoin." %}
-                    </p>
-                </div>
-
-                <div class="mt-10 grid gap-5 md:grid-cols-3">
-                    {# Étudiant #}
-                    <article class="card p-6">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
-                                     bg-navy-50 text-navy" aria-hidden="true">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                <circle cx="12" cy="7" r="4"/>
-                            </svg>
-                        </span>
-                        <h3 class="mt-4 text-lg font-bold text-navy-dark">{% trans "Étudiant" %}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                            {% trans "Soumettez vos demandes et consultez leur évolution depuis un espace personnel." %}
-                        </p>
-                        <ul class="mt-4 space-y-2">
-                            <li class="flex gap-2 text-sm text-slate-600">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-navy" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
-                                {% trans "Dépôt et suivi depuis le téléphone." %}
-                            </li>
-                            <li class="flex gap-2 text-sm text-slate-600">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-navy" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
-                                {% trans "Historique complet de vos demandes." %}
-                            </li>
-                        </ul>
-                    </article>
-
-                    {# Enseignant #}
-                    <article class="card p-6">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
-                                     bg-navy-50 text-navy" aria-hidden="true">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                            </svg>
-                        </span>
-                        <h3 class="mt-4 text-lg font-bold text-navy-dark">{% trans "Enseignant" %}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                            {% trans "Recevez, examinez et traitez les demandes qui vous sont attribuées." %}
-                        </p>
-                        <ul class="mt-4 space-y-2">
-                            <li class="flex gap-2 text-sm text-slate-600">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-navy" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
-                                {% trans "Demandes regroupées selon vos cours." %}
-                            </li>
-                            <li class="flex gap-2 text-sm text-slate-600">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-navy" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
-                                {% trans "Décision tracée et notifiée à l'étudiant." %}
-                            </li>
-                        </ul>
-                    </article>
-
-                    {# Administration #}
-                    <article class="card p-6">
-                        <span class="flex h-10 w-10 items-center justify-center rounded-xl
-                                     bg-navy-50 text-navy" aria-hidden="true">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-                                <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-                                <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-                                <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
-                                <line x1="17" y1="16" x2="23" y2="16"/>
-                            </svg>
-                        </span>
-                        <h3 class="mt-4 text-lg font-bold text-navy-dark">{% trans "Administration" %}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                            {% trans "Gérez les structures académiques, les comptes autorisés, les motifs de requête et les règles de pièces jointes." %}
-                        </p>
-                        <ul class="mt-4 space-y-2">
-                            <li class="flex gap-2 text-sm text-slate-600">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-navy" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
-                                {% trans "Import des données académiques." %}
-                            </li>
-                            <li class="flex gap-2 text-sm text-slate-600">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-navy" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
-                                {% trans "Configuration des motifs et pièces exigées." %}
-                            </li>
-                        </ul>
                     </article>
                 </div>
             </div>
         </section>
 
-        {# ==================== E — SÉCURITÉ ==================== #}
-        <section id="securite" class="scroll-mt-20 bg-white">
-            <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20">
-                <div class="grid gap-10 lg:grid-cols-2 lg:gap-16">
-                    <div class="lg:sticky lg:top-24 lg:self-start">
-                        <h2 class="text-2xl font-bold tracking-tight text-navy-dark sm:text-3xl">
-                            {% trans "Sécurité et confiance" %}
-                        </h2>
-                        <p class="mt-3 text-base leading-relaxed text-slate-600 sm:text-lg">
-                            {% trans "Vos démarches sont personnelles. La plateforme applique des règles d'accès strictes pour que seules les personnes autorisées puissent consulter et traiter une demande." %}
-                        </p>
-                        <p class="mt-4 text-sm leading-relaxed text-slate-500">
-                            {% trans "Aucun certificat ni agrément n'est revendiqué : ces principes décrivent le fonctionnement du portail." %}
-                        </p>
-                    </div>
-
-                    <ul class="grid gap-px bg-slate-200">
-                        <li class="flex gap-4 bg-white p-5">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg
-                                         bg-navy-50 text-navy" aria-hidden="true">
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                                </svg>
-                            </span>
-                            <div>
-                                <h3 class="text-sm font-bold text-navy-dark">{% trans "Accès authentifié" %}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-slate-600">
-                                    {% trans "Chaque espace personnel s'ouvre avec vos identifiants universitaires." %}
-                                </p>
-                            </div>
-                        </li>
-                        <li class="flex gap-4 bg-white p-5">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg
-                                         bg-navy-50 text-navy" aria-hidden="true">
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="11" width="18" height="11" rx="2"/>
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                                </svg>
-                            </span>
-                            <div>
-                                <h3 class="text-sm font-bold text-navy-dark">{% trans "Permissions par rôle" %}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-slate-600">
-                                    {% trans "Étudiants, enseignants et administrateurs n'accèdent qu'aux fonctions de leur rôle." %}
-                                </p>
-                            </div>
-                        </li>
-                        <li class="flex gap-4 bg-white p-5">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg
-                                         bg-navy-50 text-navy" aria-hidden="true">
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                    <path d="M14 2v6h6"/>
-                                </svg>
-                            </span>
-                            <div>
-                                <h3 class="text-sm font-bold text-navy-dark">{% trans "Demandes individuelles protégées" %}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-slate-600">
-                                    {% trans "Vos demandes ne sont visibles que par vous et par les personnes chargées de les traiter." %}
-                                </p>
-                            </div>
-                        </li>
-                        <li class="flex gap-4 bg-white p-5">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg
-                                         bg-navy-50 text-navy" aria-hidden="true">
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                                </svg>
-                            </span>
-                            <div>
-                                <h3 class="text-sm font-bold text-navy-dark">{% trans "Documents justificatifs contrôlés" %}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-slate-600">
-                                    {% trans "Les pièces jointes ne sont accessibles qu'aux utilisateurs autorisés à traiter la demande." %}
-                                </p>
-                            </div>
-                        </li>
-                        <li class="flex gap-4 bg-white p-5">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg
-                                         bg-navy-50 text-navy" aria-hidden="true">
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M3 3v5h5"/>
-                                    <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
-                                    <path d="M12 7v5l4 2"/>
-                                </svg>
-                            </span>
-                            <div>
-                                <h3 class="text-sm font-bold text-navy-dark">{% trans "Changements de statut traçables" %}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-slate-600">
-                                    {% trans "Chaque changement de statut est daté et consultable dans le suivi de la demande." %}
-                                </p>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </section>
-
-        {# ==================== F — APPEL À L'ACTION FINAL ==================== #}
-        <section id="acces" class="scroll-mt-20  bg-navy">
+        {# ==================== C — APPEL À L'ACTION FINAL ==================== #}
+        <section id="acces" class="scroll-mt-20 bg-navy">
             <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20 text-center">
-                <h2 class="mx-auto max-w-2xl text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                <h2 class="mx-auto max-w-2xl text-2xl font-extrabold tracking-tight text-white
+                           break-words sm:text-3xl lg:text-4xl">
                     {% trans "Toutes vos démarches universitaires au même endroit." %}
                 </h2>
-                <p class="mx-auto mt-3 max-w-xl text-base leading-relaxed text-white/75">
-                    {% trans "Retrouvez vos demandes et leur suivi dans un espace simple et accessible." %}
-                </p>
+                
                 <div class="mt-7 flex justify-center">
                     <a href="{% url 'accounts:login_page' %}"
                        class="btn btn-auto bg-white text-navy shadow-md hover:bg-navy-50

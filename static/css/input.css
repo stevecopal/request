@@ -40,6 +40,20 @@
   font-display: swap;
   src: url("../fonts/inter-latin-700-normal.woff2") format("woff2");
 }
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../fonts/inter-latin-800-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("../fonts/inter-latin-900-normal.woff2") format("woff2");
+}
 
 @tailwind base;
 @tailwind components;
@@ -53,6 +67,8 @@
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
+    padding-left: 0.5cm;
+    padding-right: 0.5cm;
   }
 
   body {
