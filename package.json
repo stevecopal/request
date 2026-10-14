@@ -1,0 +1,16 @@
+{
+  "name": "univreq",
+  "private": true,
+  "version": "1.0.0",
+  "description": "PWA Portail des Requêtes Universitaires — pipeline Tailwind CSS",
+  "scripts": {
+    "build": "tailwindcss -i static/css/input.css -o static/css/output.css --minify",
+    "dev": "tailwindcss -i static/css/input.css -o static/css/output.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0"
+  }
+}

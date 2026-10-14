@@ -1,0 +1,47 @@
+{% load i18n %}
+{# Corps de la modale de connexion — wiring AJAX assuré par auth_handler.js (P4) #}
+{# method="post" + action obligatoires : sans JS, aucune donnée ne part en query string. #}
+<form id="login-form" class="space-y-4" novalidate
+      method="post"
+      action="{% url 'accounts:login' %}"
+      data-login-url="{% url 'accounts:login' %}">
+    {% csrf_token %}
+
+    <div>
+        <label class="label" for="login-matricule">
+            {% trans "Matricule" %} <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <input class="field"
+               id="login-matricule"
+               name="matricule"
+               type="text"
+               inputmode="text"
+               autocomplete="username"
+               autocapitalize="characters"
+               spellcheck="false"
+               required
+               aria-describedby="login-help">
+       
+    </div>
+
+    <div>
+        <label class="label" for="login-password">
+            {% trans "Mot de passe" %} <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <input class="field"
+               id="login-password"
+               name="password"
+               type="password"
+               autocomplete="current-password"
+               required>
+       
+    </div>
+
+    <p id="login-error"
+       class="hidden text-sm font-medium text-red-600"
+       role="alert"></p>
+
+    <button type="submit" class="btn btn-primary" id="login-submit">
+        {% trans "Se connecter" %}
+    </button>
+</form>

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Tableau de bord" %} — {{ block.super }}{% endblock %}
+
+{% block layout %}
+{# Coque SPA responsive : navigation basse sur mobile, horizontale sur desktop. #}
+<div class="min-h-screen flex flex-col">
+
+    <header class="sticky top-0 z-40 bg-navy text-white shadow-md">
+        <div class="max-w-shell mx-auto flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-16">
+
+            {# Marque #}
+            <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-2.5 shrink-0">
+                <span class="brand-mark !bg-white/15 !shadow-none" aria-hidden="true">
+                    <svg class="w-6 h-6 text-white" viewBox="0 0 32 32" fill="none">
+                        <path d="M16 7 5 12.5 16 18l11-5.5L16 7Z" fill="currentColor"/>
+                        <path d="M9 15.5v4.2c0 1.6 3.1 3.3 7 3.3s7-1.7 7-3.3v-4.2"
+                              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </span>
+                <span class="font-extrabold tracking-tight text-lg">{% trans "UnivReq" %}</span>
+            </a>
+
+            {# Navigation horizontale — desktop uniquement (≥ lg) #}
+            <nav class="hidden lg:flex items-center gap-1 flex-1 ml-4"
+                 aria-label="{% trans 'Navigation principale' %}">
+                {% for item in nav_items %}
+                    <button type="button"
+                            class="top-nav__item"
+                            {% if item.aria_current %}aria-current="page"{% endif %}
+                            {% if item.is_modal %}
+                                data-modal-src="{{ item.url }}"
+                                data-modal-title="{{ item.modal_title }}"
+                            {% else %}
+                                data-fragment-src="{{ item.url }}"
+                            {% endif %}>
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true">{{ item.icon|safe }}</svg>
+                        {{ item.label }}
+                    </button>
+                {% endfor %}
+            </nav>
+
+            {# Utilisateur : nom (≥ sm) + pastille #}
+            <div class="ml-auto lg:ml-4 flex items-center gap-3 shrink-0">
+                <span class="hidden sm:inline-flex text-xs font-medium bg-white/15 px-3 py-1 rounded-full truncate max-w-[38vw]">
+                    {{ request.user.get_full_name|default:request.user.username }}
+                </span>
+                <span class="w-9 h-9 rounded-full bg-white/20 ring-2 ring-white/30
+                             flex items-center justify-center text-sm font-bold shrink-0"
+                      aria-hidden="true">
+                    {{ request.user.last_name|default:request.user.username|first|upper }}
+                </span>
+            </div>
+        </div>
+    </header>
+
+    {# Configuration passée au noyau SPA : fragment initial + modale éventuelle #}
+    <div id="spa-config" class="hidden"
+         data-initial-fragment="{{ initial_fragment }}"
+         {% if needs_onboarding %}data-initial-modal="{{ onboarding_modal }}"
+         data-initial-modal-title="{% trans 'Compléter mon profil' %}"{% endif %}></div>
+
+    {# Viewport unique : tous les fragments AJAX sont injectés ici #}
+    <main id="spa-viewport"
+          class="flex-1 w-full max-w-content mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-28 lg:pb-16"
+          tabindex="-1"
+          aria-busy="true">
+        {% include "components/skeleton_list.html" %}
+    </main>
+
+    {% include "components/bottom_nav.html" %}
+</div>
+{% endblock %}

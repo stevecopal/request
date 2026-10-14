@@ -1,0 +1,45 @@
+{% load i18n %}
+{# Formulaire dynamique de nouvelle requête — les champs UE/enseignant/pièces
+   jointes sont injectés par ticket_form_dynamic.js selon le type de problème. #}
+<form id="ticket-form" class="space-y-4" novalidate
+      method="post"
+      action="{% url 'tickets:create_ticket' %}"
+      enctype="multipart/form-data"
+      data-form-config-url="{% url 'core_scolarite:form_config' %}"
+      data-create-url="{% url 'tickets:create_ticket' %}"
+      data-feed-url="{% url 'tickets:student_feed' %}">
+    {% csrf_token %}
+
+    <div>
+        <label class="label" for="problem-type">
+            {% trans "Type de problème" %} <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <select class="field" id="problem-type" name="problem_type_id" required
+                data-form-config-trigger>
+            <option value="">{% trans "Sélectionnez un type de problème" %}</option>
+            {% for pt in problem_types %}
+                <option value="{{ pt.id }}"
+                        data-description="{{ pt.description }}">{{ pt.name }}</option>
+            {% endfor %}
+        </select>
+        <p class="helper" id="problem-type-hint"></p>
+    </div>
+
+    {# Zone dynamique : UE, enseignant et pièces jointes #}
+    <div id="dynamic-fields" class="space-y-4" aria-live="polite"></div>
+
+    <div>
+        <label class="label" for="ticket-description">
+            {% trans "Commentaires" %} <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <textarea class="field min-h-24" id="ticket-description" name="description"
+                  rows="4" required
+                  placeholder="{% trans 'Décrivez précisément votre situation…' %}"></textarea>
+    </div>
+
+    <p id="ticket-error" class="hidden text-sm font-medium text-red-600" role="alert"></p>
+
+    <button type="submit" class="btn btn-primary" id="ticket-submit">
+        {% trans "Envoyer la requête" %}
+    </button>
+</form>

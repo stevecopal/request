@@ -1,0 +1,13 @@
+{% load i18n %}
+{# Badge de statut — code couleur : gris/bleu/ambre/émeraude/rouge (MASTER §3) #}
+{% if status == 'RECEIVED' %}
+    <span class="badge-status bg-blue-100 text-blue-700" data-status-badge>{{ label }}</span>
+{% elif status == 'PROCESSING' %}
+    <span class="badge-status bg-amber-100 text-amber-700" data-status-badge>{{ label }}</span>
+{% elif status == 'RESOLVED' %}
+    <span class="badge-status bg-emerald-100 text-emerald-700" data-status-badge>{{ label }}</span>
+{% elif status == 'REJECTED' %}
+    <span class="badge-status bg-red-100 text-red-700" data-status-badge>{{ label }}</span>
+{% else %}
+    <span class="badge-status bg-slate-100 text-slate-700" data-status-badge>{{ label }}</span>
+{% endif %}

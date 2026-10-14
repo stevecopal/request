@@ -1,0 +1,85 @@
+{% load i18n %}
+{# Tableau de bord analytique (super-admin) — injecté dans #spa-viewport #}
+<div class="rise space-y-6">
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-bold text-navy-dark">{% trans "Pilotage" %}</h2>
+            <p class="text-sm text-slate-500">{% trans "Vue d'exploitation de la plateforme" %}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                    data-modal-src="{% url 'core_scolarite:admin_manual_account_modal' %}"
+                    data-modal-title="{% trans 'Nouveau compte' %}">
+                {% trans "Ajouter" %}
+            </button>
+            <button type="button" class="btn btn-primary !w-auto !min-h-11 px-4 text-sm"
+                    data-modal-src="{% url 'core_scolarite:admin_import_modal' %}"
+                    data-modal-title="{% trans 'Import de données' %}">
+                {% trans "Importer" %}
+            </button>
+        </div>
+    </div>
+
+    {# KPI globaux — grille 2 colonnes mobile, 4 colonnes desktop #}
+    <div class="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div class="card p-4 rise rise-item">
+            <p class="text-xs font-medium text-slate-500">{% trans "Requêtes totales" %}</p>
+            <p class="mt-1 text-3xl font-extrabold text-navy">{{ totals.total }}</p>
+        </div>
+        <div class="card p-4 rise rise-item">
+            <p class="text-xs font-medium text-slate-500">{% trans "Non résolues" %}</p>
+            <p class="mt-1 text-3xl font-extrabold text-amber-600">{{ totals.pending }}</p>
+        </div>
+        <div class="card p-4 rise rise-item">
+            <p class="text-xs font-medium text-slate-500">{% trans "Résolues" %}</p>
+            <p class="mt-1 text-3xl font-extrabold text-emerald-600">{{ totals.resolved }}</p>
+        </div>
+        <div class="card p-4 rise rise-item">
+            <p class="text-xs font-medium text-slate-500">{% trans "Rejetées" %}</p>
+            <p class="mt-1 text-3xl font-extrabold text-red-600">{{ totals.rejected }}</p>
+        </div>
+    </div>
+
+    {# Métriques par faculté #}
+    <section>
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">
+            {% trans "Performance par faculté" %}
+        </h3>
+        {% if per_faculty %}
+            <ul class="space-y-3">
+                {% for row in per_faculty %}
+                    <li class="card p-4 rise rise-item">
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="font-semibold text-navy-dark text-sm">{{ row.faculty_name }}</p>
+                            <span class="badge-status bg-navy-50 text-navy">
+                                {{ row.total }} {% trans "req." %}
+                            </span>
+                        </div>
+                        <dl class="mt-3 grid grid-cols-3 gap-2 text-center">
+                            <div class="rounded-xl bg-slate-50 py-2">
+                                <dt class="text-[11px] text-slate-500">{% trans "En cours" %}</dt>
+                                <dd class="font-bold text-amber-600">{{ row.pending }}</dd>
+                            </div>
+                            <div class="rounded-xl bg-slate-50 py-2">
+                                <dt class="text-[11px] text-slate-500">{% trans "Résolues" %}</dt>
+                                <dd class="font-bold text-emerald-600">{{ row.resolved }}</dd>
+                            </div>
+                            <div class="rounded-xl bg-slate-50 py-2">
+                                <dt class="text-[11px] text-slate-500">{% trans "Délai moyen" %}</dt>
+                                <dd class="font-bold text-navy">
+                                    {% if row.avg_response_hours %}{{ row.avg_response_hours }} h{% else %}—{% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="card p-8 text-center text-slate-500">
+                <p class="text-base font-semibold text-navy-dark">{% trans "Aucune donnée pour le moment." %}</p>
+                <p class="mt-1 text-sm">{% trans "Les métriques apparaîtront dès la première requête." %}</p>
+            </div>
+        {% endif %}
+    </section>
+</div>

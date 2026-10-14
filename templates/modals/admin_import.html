@@ -1,0 +1,45 @@
+{% load i18n %}
+{# Modale d'import massif (super-admin) — erreurs ligne à ligne rendues dynamiquement #}
+<form id="admin-import-form" class="space-y-5" novalidate
+      method="post"
+      action="{% url 'core_scolarite:admin_import_upload' %}"
+      enctype="multipart/form-data"
+      data-import-url="{% url 'core_scolarite:admin_import_upload' %}">
+    {% csrf_token %}
+
+    <div>
+        <label class="label" for="import-entity">{% trans "Type de comptes" %}</label>
+        <select class="field" id="import-entity" name="entity">
+            <option value="students">{% trans "Étudiants" %}</option>
+            <option value="teachers">{% trans "Enseignants" %}</option>
+        </select>
+    </div>
+
+    <div>
+        <label class="label" for="import-file">
+            {% trans "Fichier CSV / XLSX" %} <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <input class="field file:mr-3 file:rounded-lg file:border-0 file:bg-navy file:text-white file:px-3 file:py-2"
+               id="import-file" name="file" type="file"
+               accept=".csv,.xlsx" required>
+        <p class="helper">
+            {% trans "En-têtes requis : MATRICULE, NOM, PRENOM, EMAIL, FACULTE, DEPARTEMENT." %}
+        </p>
+    </div>
+
+    <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 cursor-pointer">
+        <input type="checkbox" name="strict_placement" value="true" checked class="mt-1 w-5 h-5 accent-navy">
+        <span class="text-sm text-navy-dark">
+            {% trans "Exiger faculté et département (décochez pour des profils à compléter par l'étudiant)." %}
+        </span>
+    </label>
+
+    <div id="import-errors" class="hidden rounded-xl bg-red-50 border border-red-200 p-4" role="alert">
+        <p class="text-sm font-semibold text-red-700" id="import-errors-title"></p>
+        <ul class="mt-2 space-y-1 text-xs text-red-700 max-h-40 overflow-y-auto" id="import-errors-list"></ul>
+    </div>
+
+    <button type="submit" class="btn btn-primary" id="import-submit">
+        {% trans "Lancer l'import" %}
+    </button>
+</form>

@@ -1,0 +1,75 @@
+{% load i18n %}
+{# Fragment profil injecté dans #spa-viewport #}
+<div class="rise space-y-5">
+
+    {# En-tête d'identité #}
+    <header class="card p-6 flex items-center gap-4">
+        <span class="w-14 h-14 rounded-2xl bg-gradient-to-br from-navy-700 to-navy
+                     text-white shadow-brand flex items-center justify-center text-xl font-bold shrink-0"
+              aria-hidden="true">
+            {{ request.user.last_name|default:request.user.username|first|upper }}
+        </span>
+        <div class="min-w-0">
+            <h2 class="text-lg font-bold text-navy-dark truncate">
+                {{ request.user.get_full_name|default:request.user.username }}
+            </h2>
+            <p class="text-sm text-slate-500 truncate">
+                {% if role == 'student' %}{% trans "Étudiant" %}
+                {% elif role == 'teacher' %}{% trans "Enseignant" %}
+                {% elif role == 'admin' %}{% trans "Super-administrateur" %}{% endif %}
+            </p>
+        </div>
+    </header>
+
+    {# Détails du compte #}
+    <section class="card p-5">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500">
+            {% trans "Informations" %}
+        </h3>
+
+        <dl class="mt-3 text-sm space-y-2">
+            {% if role == 'student' and student %}
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Matricule" %}</dt>
+                    <dd class="font-semibold text-navy-dark">{{ student.registration_number }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Faculté" %}</dt>
+                    <dd class="font-semibold text-navy-dark text-right">{{ student.faculty.name|default:"—" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Département" %}</dt>
+                    <dd class="font-semibold text-navy-dark text-right">{{ student.department.name|default:"—" }}</dd>
+                </div>
+            {% elif role == 'teacher' and teacher %}
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Titre" %}</dt>
+                    <dd class="font-semibold text-navy-dark">{{ teacher.get_title_display }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Faculté" %}</dt>
+                    <dd class="font-semibold text-navy-dark text-right">{{ teacher.faculty.name }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Département" %}</dt>
+                    <dd class="font-semibold text-navy-dark text-right">{{ teacher.department.name }}</dd>
+                </div>
+            {% elif role == 'admin' %}
+                <p class="text-slate-600">{% trans "Accès complet au pilotage de la plateforme." %}</p>
+            {% endif %}
+        </dl>
+    </section>
+
+    {# Sécurité : la gestion des identifiants est centralisée (§9.2). #}
+    <aside class="rounded-2xl bg-amber-50 border border-amber-200 p-4 flex gap-3">
+        <span class="text-xl" aria-hidden="true">🔒</span>
+        <p class="text-sm text-amber-900 leading-relaxed">
+            {% blocktrans %}La gestion des identifiants est centralisée. Pour modifier vos accès, veuillez vous rendre sur le portail informatique de l'université.{% endblocktrans %}
+        </p>
+    </aside>
+
+    <button type="button" class="btn btn-ghost" data-logout
+            data-logout-url="{% url 'accounts:logout' %}">
+        {% trans "Se déconnecter" %}
+    </button>
+</div>

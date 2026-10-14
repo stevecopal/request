@@ -1,0 +1,35 @@
+{% load i18n %}
+{# Modale de décision enseignant — Valider (RESOLVED) ou Rejeter (REJECTED + motif) #}
+<form id="teacher-decision-form" class="space-y-4" novalidate
+      method="post"
+      action="{% url 'tickets:update_status' %}"
+      data-status-url="{% url 'tickets:update_status' %}">
+    {% csrf_token %}
+    <input type="hidden" name="ticket_id" value="{{ ticket.id }}">
+    <input type="hidden" name="status" value="{{ target }}">
+
+    <p class="text-sm text-slate-600">
+        {% if target == 'RESOLVED' %}
+            {% trans "Confirmez la validation de cette requête. L'étudiant en sera notifié immédiatement." %}
+        {% else %}
+            {% trans "Indiquez le motif du rejet : il sera transmis à l'étudiant." %}
+        {% endif %}
+    </p>
+
+    {% if target == 'REJECTED' %}
+        <div>
+            <label class="label" for="decision-reason">
+                {% trans "Motif du rejet" %} <span class="text-red-600" aria-hidden="true">*</span>
+            </label>
+            <textarea class="field min-h-24" id="decision-reason" name="rejection_reason"
+                      rows="3" required></textarea>
+        </div>
+    {% endif %}
+
+    <p id="decision-error" class="hidden text-sm font-medium text-red-600" role="alert"></p>
+
+    <button type="submit"
+            class="btn {% if target == 'RESOLVED' %}btn-success{% else %}btn-danger{% endif %}">
+        {% if target == 'RESOLVED' %}{% trans "Valider" %}{% else %}{% trans "Rejeter" %}{% endif %}
+    </button>
+</form>

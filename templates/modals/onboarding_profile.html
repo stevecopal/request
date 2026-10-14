@@ -1,0 +1,41 @@
+{% load i18n %}
+{# Modale d'onboarding (Cas A) — cascade Faculté → Département via AJAX #}
+<form id="onboarding-form" class="space-y-5" novalidate
+      method="post"
+      action="{% url 'accounts:onboarding' %}"
+      data-onboarding-url="{% url 'accounts:onboarding' %}">
+    {% csrf_token %}
+
+    <p class="text-sm text-slate-600">
+        {% trans "Bienvenue ! Avant votre première requête, veuillez finaliser votre profil." %}
+    </p>
+
+    <div>
+        <label class="label" for="onboarding-faculty">
+            {% trans "Faculté" %} <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <select class="field" id="onboarding-faculty" name="faculty" required
+                data-department-target="#onboarding-department"
+                data-departments-url="{% url 'accounts:departments' %}">
+            <option value="">{% trans "Sélectionnez une faculté" %}</option>
+            {% for faculty in faculties %}
+                <option value="{{ faculty.id }}">{{ faculty.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <label class="label" for="onboarding-department">
+            {% trans "Département" %} <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <select class="field" id="onboarding-department" name="department" required disabled>
+            <option value="">{% trans "Sélectionnez d'abord une faculté" %}</option>
+        </select>
+    </div>
+
+    <p id="onboarding-error" class="hidden text-sm font-medium text-red-600" role="alert"></p>
+
+    <button type="submit" class="btn btn-primary" id="onboarding-submit">
+        {% trans "Enregistrer mon profil" %}
+    </button>
+</form>

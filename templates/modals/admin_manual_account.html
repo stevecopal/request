@@ -1,0 +1,72 @@
+{% load i18n %}
+{# Modale de création manuelle d'un compte (option A du brief) #}
+<form id="admin-manual-form" class="space-y-4" novalidate
+      method="post"
+      action="{% url 'core_scolarite:admin_create_account' %}"
+      data-create-url="{% url 'core_scolarite:admin_create_account' %}">
+    {% csrf_token %}
+
+    <div>
+        <label class="label" for="manual-entity">{% trans "Type de compte" %}</label>
+        <select class="field" id="manual-entity" name="entity">
+            <option value="students">{% trans "Étudiant" %}</option>
+            <option value="teachers">{% trans "Enseignant" %}</option>
+        </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+        <div>
+            <label class="label" for="manual-first">{% trans "Prénom" %}</label>
+            <input class="field" id="manual-first" name="first_name" type="text" required>
+        </div>
+        <div>
+            <label class="label" for="manual-last">{% trans "Nom" %}</label>
+            <input class="field" id="manual-last" name="last_name" type="text" required>
+        </div>
+    </div>
+
+    <div>
+        <label class="label" for="manual-matricule">{% trans "Matricule" %}</label>
+        <input class="field" id="manual-matricule" name="matricule" type="text"
+               autocapitalize="characters" required>
+    </div>
+
+    <div>
+        <label class="label" for="manual-email">{% trans "Email" %}</label>
+        <input class="field" id="manual-email" name="email" type="email" required>
+    </div>
+
+    <div>
+        <label class="label" for="manual-title">{% trans "Titre (enseignant)" %}</label>
+        <select class="field" id="manual-title" name="title">
+            <option value="">—</option>
+            <option value="DR">{% trans "Dr." %}</option>
+            <option value="PR">{% trans "Pr." %}</option>
+            <option value="MR">{% trans "M." %}</option>
+            <option value="MME">{% trans "Mme" %}</option>
+        </select>
+    </div>
+
+    <div>
+        <label class="label" for="manual-faculty">{% trans "Faculté" %}</label>
+        <select class="field" id="manual-faculty" name="faculty" required
+                data-department-target="#manual-department"
+                data-departments-url="{% url 'accounts:departments' %}">
+            <option value="">{% trans "Sélectionnez une faculté" %}</option>
+            {% for faculty in faculties %}
+                <option value="{{ faculty.id }}">{{ faculty.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <label class="label" for="manual-department">{% trans "Département" %}</label>
+        <select class="field" id="manual-department" name="department" required disabled>
+            <option value="">{% trans "Sélectionnez d'abord une faculté" %}</option>
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        {% trans "Créer le compte" %}
+    </button>
+</form>

@@ -1,0 +1,287 @@
+/*
+ * UnivReq — couche d'entrée Tailwind CSS (ARCHITECTURE §11, MASTER.md).
+ *
+ * Pipeline : npm run build  →  static/css/output.css (minifié, seul fichier lié)
+ * Ne jamais écrire de CSS hors de ce fichier : styles = utilitaires Tailwind
+ * + composants déclarés dans @layer ci-dessous.
+ *
+ * Design system : mobile-first (bottom-nav < lg, navigation horizontale ≥ lg),
+ * palette navy, mouvement réduit respecté.
+ */
+
+/* ------------------------------------------------------------------ *
+ * Police Inter auto-hébergée — licence SIL OFL (static/fonts/*.woff2)
+ * ------------------------------------------------------------------ */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/inter-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/inter-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/inter-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/inter-latin-700-normal.woff2") format("woff2");
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ================================================================== *
+ * BASE — reset mobile, accessibilité, mouvement réduit
+ * ================================================================== */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-navy-dark font-sans antialiased;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Défilement discret (desktop) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.navy.200") transparent;
+  }
+
+  /* Focus clavier visible partout */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    @apply outline-none ring-2 ring-navy ring-offset-2 ring-offset-background;
+  }
+
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus {
+    @apply not-sr-only fixed top-2 left-2 z-[60] bg-white text-navy font-semibold
+           px-4 py-2 rounded-xl shadow-lg;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ================================================================== *
+ * COMPOSANTS — contrat de classes (MASTER.md §5)
+ * ================================================================== */
+@layer components {
+  /* --- Boutons : cible tactile ≥ 48px, feedback active:scale-95 ------ */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 min-h-12 px-6 rounded-xl
+           font-semibold text-base select-none
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy
+           focus-visible:ring-offset-2
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply w-full bg-navy text-white shadow-brand hover:bg-navy-700 active:scale-95;
+  }
+  .btn-success {
+    @apply w-full bg-emerald-600 text-white shadow-md hover:bg-emerald-700 active:scale-95;
+  }
+  .btn-danger {
+    @apply w-full bg-red-600 text-white shadow-md hover:bg-red-700 active:scale-95;
+  }
+  .btn-ghost {
+    @apply w-full bg-white text-navy border border-slate-200
+           hover:border-navy hover:bg-navy-50 active:scale-95;
+  }
+  /* Variante à largeur auto (héros, navbar, footer) — doit suivre btn-primary
+     dans la source pour primer sur w-full sans !important. */
+  .btn-auto {
+    @apply w-auto;
+  }
+
+  /* --- Champs de saisie : focus bleu accent + anneau navy ------------ */
+  .field {
+    @apply w-full min-h-12 px-4 rounded-xl border border-slate-200 bg-white
+           text-navy-dark placeholder:text-slate-400 transition-colors
+           focus:outline-none focus:border-navy-light focus:ring-2 focus:ring-navy/30;
+  }
+  .field-error {
+    @apply border-red-600 ring-2 ring-red-600/30;
+  }
+  .label {
+    @apply block text-sm font-medium text-navy-dark mb-1.5;
+  }
+  .helper {
+    @apply mt-1.5 text-xs text-slate-500;
+  }
+
+  /* --- Carte générique : surface blanche, coins larges, survol ------- */
+  .card {
+    @apply bg-white rounded-2xl border border-slate-100 shadow-card
+           transition-all duration-200;
+  }
+  .card-hover {
+    @apply hover:shadow-card-hover hover:border-navy-100 hover:-translate-y-0.5;
+  }
+
+  /* --- Entrée en scène des fragments (chargement AJAX) --------------- */
+  .rise {
+    @apply animate-rise;
+  }
+  .rise-item:nth-child(1) { animation-delay: 0ms; }
+  .rise-item:nth-child(2) { animation-delay: 60ms; }
+  .rise-item:nth-child(3) { animation-delay: 120ms; }
+  .rise-item:nth-child(4) { animation-delay: 180ms; }
+  .rise-item:nth-child(5) { animation-delay: 240ms; }
+  .rise-item:nth-child(6) { animation-delay: 300ms; }
+
+  /* --- Toaster global (#global-toaster) ----------------------------- */
+  .toast {
+    @apply flex items-center gap-3 bg-white rounded-xl p-4 shadow-card-hover
+           border-l-4 pointer-events-auto;
+  }
+  .toast-success {
+    @apply border-l-emerald-600;
+  }
+  .toast-error {
+    @apply border-l-red-600;
+  }
+
+  /* --- Navigation basse (mobile uniquement, < lg) -------------------- */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur
+           border-t border-slate-200 shadow-[0_-8px_24px_-16px_rgba(15,23,42,0.35)]
+           lg:hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-nav__item {
+    @apply relative flex flex-1 flex-col items-center justify-center gap-0.5
+           min-h-16 px-2 text-[11px] font-semibold text-slate-500
+           transition-colors duration-150;
+  }
+  .bottom-nav__item[aria-current="page"] {
+    @apply text-navy;
+  }
+  .bottom-nav__item[aria-current="page"]::before {
+    content: "";
+    @apply absolute top-0 left-1/2 -translate-x-1/2 h-1 w-8 rounded-b-full bg-navy;
+  }
+
+  /* --- Navigation horizontale (desktop, ≥ lg) ----------------------- */
+  .top-nav__item {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
+           text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150;
+  }
+  .top-nav__item[aria-current="page"] {
+    @apply text-white bg-white/15;
+  }
+
+  /* --- Navigation publique (landing) : liens de section -------------- */
+  .public-nav__link {
+    @apply flex min-h-12 items-center rounded-lg px-3 text-sm font-semibold
+           text-slate-600 transition-colors duration-150
+           hover:bg-navy-50 hover:text-navy;
+  }
+  /* Version tiroir mobile : cible tactile pleine largeur, corps de texte */
+  .public-nav__link--mobile {
+    @apply text-base;
+  }
+
+  /* --- Liens du pied de page public (fond navy → anneau blanc) ------- */
+  .public-footer__link {
+    @apply inline-flex min-h-12 items-center text-sm text-white/75
+           underline-offset-4 transition-colors duration-150
+           hover:text-white hover:underline
+           focus-visible:ring-2 focus-visible:ring-white
+           focus-visible:ring-offset-2 focus-visible:ring-offset-navy;
+  }
+
+  /* --- Carte de requête : rail de statut coloré (signature) ---------- */
+  .ticket-card {
+    @apply relative bg-white rounded-2xl border border-slate-100 shadow-card
+           p-4 pl-5 overflow-hidden text-left transition-all duration-200;
+  }
+  .ticket-card:hover {
+    @apply shadow-card-hover border-navy-100;
+  }
+  .ticket-card::before {
+    content: "";
+    @apply absolute left-0 top-0 bottom-0 w-1.5 bg-slate-400;
+  }
+  .ticket-card[data-status="RECEIVED"]::before { @apply bg-blue-600; }
+  .ticket-card[data-status="PROCESSING"]::before { @apply bg-amber-500; }
+  .ticket-card[data-status="RESOLVED"]::before { @apply bg-emerald-600; }
+  .ticket-card[data-status="REJECTED"]::before { @apply bg-red-600; }
+
+  /* --- Squelette de chargement : shimmer au lieu du simple pulse ----- */
+  .skeleton {
+    @apply relative overflow-hidden bg-slate-200 rounded-xl;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r
+           from-transparent via-white/70 to-transparent animate-shimmer;
+  }
+
+  /* --- Spinner de chargement (boutons) ------------------------------ */
+  .spinner {
+    @apply inline-block w-5 h-5 rounded-full border-2 border-current
+           border-t-transparent animate-spin;
+  }
+
+  /* --- Badge de statut (contraste AA) ------------------------------- */
+  .badge-status {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full
+           text-xs font-semibold whitespace-nowrap;
+  }
+
+  /* --- Marque (logo) réutilisable ----------------------------------- */
+  .brand-mark {
+    @apply w-10 h-10 rounded-xl bg-gradient-to-br from-navy-700 to-navy
+           shadow-brand flex items-center justify-center shrink-0;
+  }
+
+  /* --- Hero : dégradé de marque + motif discret ---------------------- */
+  .hero-surface {
+    @apply relative overflow-hidden bg-gradient-to-b from-navy-50 via-background to-background;
+  }
+  .hero-surface::before {
+    content: "";
+    @apply absolute -top-24 -right-24 w-72 h-72 rounded-full
+           bg-navy/10 blur-3xl pointer-events-none;
+  }
+  .hero-surface::after {
+    content: "";
+    @apply absolute -bottom-32 -left-24 w-80 h-80 rounded-full
+           bg-navy-600/10 blur-3xl pointer-events-none;
+  }
+}
