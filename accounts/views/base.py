@@ -59,9 +59,17 @@ def dashboard_shell(request):
     )
 
     _prime_csrf_cookie(request)
+    unread_notifications = 0
+    if role in (ROLE_STUDENT, "teacher"):
+        from accounts.models import Notification
+
+        unread_notifications = Notification.objects.filter(
+            user=request.user, is_read=False
+        ).count()
     context = {
         "role": role,
-        "nav_items": nav_items(role),
+        "nav_items": nav_items(role, unread_notifications=unread_notifications),
+        "unread_notifications": unread_notifications,
         "initial_fragment": reverse(role_dashboard_url(role)),
         "needs_onboarding": needs_onboarding,
         "onboarding_modal": reverse("accounts:onboarding_modal"),

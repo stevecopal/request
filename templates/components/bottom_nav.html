@@ -17,6 +17,13 @@
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                      aria-hidden="true">{{ item.icon|safe }}</svg>
                 <span>{{ item.label }}</span>
+                {% if item.badge %}
+                    <span data-unread-badge
+                          class="absolute top-1 right-[calc(50%-1.6rem)] min-w-4 h-4 px-1 rounded-full
+                                 bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
+                        {{ item.badge }}
+                    </span>
+                {% endif %}
             </button>
         {% endfor %}
     </div>

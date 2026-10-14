@@ -46,7 +46,8 @@ class TicketModelTests(TestCase):
     def test_status_choices_complete(self):
         values = {choice.value for choice in Ticket.Status}
         self.assertEqual(
-            values, {"SENT", "RECEIVED", "PROCESSING", "RESOLVED", "REJECTED"}
+            values,
+            {"SENT", "RECEIVED", "PROCESSING", "MORE_INFO", "RESOLVED", "REJECTED"},
         )
 
     def test_rejected_requires_reason_constraint(self):

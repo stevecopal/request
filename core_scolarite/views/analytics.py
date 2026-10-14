@@ -20,6 +20,7 @@ from tickets.models import Ticket
 OPEN_STATUSES = [
     Ticket.Status.SENT,
     Ticket.Status.RECEIVED,
+    Ticket.Status.MORE_INFO,
     Ticket.Status.PROCESSING,
 ]
 

@@ -26,9 +26,23 @@
     SENT: "badge-status bg-slate-100 text-slate-700",
     RECEIVED: "badge-status bg-blue-100 text-blue-700",
     PROCESSING: "badge-status bg-amber-100 text-amber-700",
+    MORE_INFO: "badge-status bg-violet-100 text-violet-700",
     RESOLVED: "badge-status bg-emerald-100 text-emerald-700",
     REJECTED: "badge-status bg-red-100 text-red-700",
   };
+
+  function updateUnreadBadges(count) {
+    if (typeof count !== "number") return;
+    document.querySelectorAll("[data-unread-badge]").forEach(function (badge) {
+      if (count > 0) {
+        badge.textContent = String(count);
+        badge.classList.remove("hidden");
+      } else {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+      }
+    });
+  }
 
   function patchCard(payload) {
     var selector = '[data-ticket-id="' + payload.ticket_id + '"]';
@@ -46,6 +60,10 @@
 
   function handleMessage(payload) {
     var updated = patchCard(payload);
+
+    // Badge de navigation : compteur de notifications non lues émis par le
+    // signal serveur (uniquement le destinataire concerné le reçoit).
+    updateUnreadBadges(payload.unread_notifications);
 
     if (navigator.vibrate) navigator.vibrate(50);
 
@@ -74,7 +92,10 @@
 
   function resyncCurrentView() {
     if (!spaReady()) return;
-    api.loadFragment(window.location.pathname, { target: "#spa-viewport", pushState: false });
+    api.loadFragment(window.location.pathname + window.location.search, {
+      target: "#spa-viewport",
+      pushState: false,
+    });
   }
 
   function startPolling() {

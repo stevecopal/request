@@ -1,16 +1,22 @@
 /**
  * ticket_lifecycle.js — cycle de vie des requêtes (soumission + décisions).
  *
- *   - #ticket-form (étudiant)  : envoi multipart → rafraîchit le flux, toaster ;
- *   - [data-ticket-select]     : charge le détail dans #teacher-ticket-detail ;
- *   - [data-status-action]     : transition directe (ex. Démarrer l'analyse) ;
- *   - #teacher-decision-form   : Valider / Rejeter (motif obligatoire).
+ *   - #ticket-form (étudiant)   : étape 1 saisie → étape 2 prévisualisation
+ *     → envoi multipart unique, toaster, rechargement du flux ;
+ *   - #student-reply-form        : réponse à une demande MORE_INFO ;
+ *   - #feed-filter (étudiant)    : recherche/filtre/pagination sans rechargement ;
+ *   - [data-notifications-read]  : marquage « lu » + badge de navigation ;
+ *   - [data-ticket-select]       : charge le détail dans #teacher-ticket-detail ;
+ *   - [data-status-action]       : transition directe (Démarrer l'analyse…) ;
+ *   - #teacher-decision-form     : Valider / Rejeter (motif) / Plus d'infos
+ *     (question obligatoire).
  */
 (function () {
   "use strict";
 
   var api = window.UnivReq;
   var lastDetailUrl = null;
+  var previewConfirmed = false;
 
   function setBusy(button, busy) {
     if (!button) return;
@@ -18,41 +24,258 @@
     button.setAttribute("aria-busy", busy ? "true" : "false");
   }
 
+  function errorBoxOf(box, message) {
+    if (!box) return;
+    box.textContent = message;
+    box.classList.remove("hidden");
+  }
+
   /* ---------------------------- ÉTUDIANT ---------------------------- */
+
+  function escapeHtml(value) {
+    var div = document.createElement("div");
+    div.textContent = value == null ? "" : value;
+    return div.innerHTML;
+  }
+
+  function fillPreview(form) {
+    var list = form.querySelector("#ticket-preview-list");
+    if (!list) return;
+
+    var typeSelect = form.querySelector("#problem-type");
+    var yearSelect = form.querySelector("#academic-year");
+    var description = form.querySelector("#ticket-description");
+    var course = form.querySelector('[name="course_id"]');
+    var teacher = form.querySelector('[name="teacher_id"]');
+
+    var rows = [];
+    rows.push({ term: "Type de problème", value: typeSelect ? typeSelect.selectedOptions[0].text : "" });
+    rows.push({ term: "Année académique", value: yearSelect ? yearSelect.value : "" });
+    rows.push({
+      term: course ? "Unité d'enseignement" : "Enseignant concerné",
+      value: course || teacher ? (course || teacher).selectedOptions[0].text : "",
+    });
+
+    list.innerHTML = rows
+      .map(function (row) {
+        if (!row.value || row.value.indexOf("— Sélectionnez") === 0) return "";
+        return (
+          '<div class="flex justify-between gap-4">' +
+          '<dt class="text-slate-500 shrink-0">' +
+          row.term +
+          "</dt>" +
+          '<dd class="font-medium text-navy-dark text-right">' +
+          escapeHtml(row.value) +
+          "</dd>" +
+          "</div>"
+        );
+      })
+      .join("");
+
+    var files = Array.prototype.map
+      .call(form.querySelectorAll('input[type="file"]'), function (input) {
+        return input.files && input.files.length
+          ? input.files[0].name
+          : null;
+      })
+      .filter(Boolean);
+    if (files.length) {
+      list.insertAdjacentHTML(
+        "beforeend",
+        '<div class="flex justify-between gap-4">' +
+          '<dt class="text-slate-500 shrink-0">Pièces jointes</dt>' +
+          '<dd class="font-medium text-navy-dark text-right">' +
+          escapeHtml(files.join(", ")) +
+          "</dd>" +
+          "</div>"
+      );
+    }
+
+    list.insertAdjacentHTML(
+      "beforeend",
+      '<div class="pt-1 border-t border-navy-100">' +
+        '<p class="label !mb-0">Commentaires</p>' +
+        '<p class="text-sm text-navy-dark whitespace-pre-line"></p>' +
+        "</div>"
+    );
+    list.lastElementChild.querySelector("p:last-child").textContent = description
+      ? description.value.trim()
+      : "";
+  }
+
+  function showPreview(form, show) {
+    var fields = form.querySelector("#ticket-form-fields");
+    var preview = form.querySelector("#ticket-preview");
+    var submit = form.querySelector("#ticket-submit");
+    if (!fields || !preview || !submit) return;
+    fields.classList.toggle("hidden", show);
+    submit.classList.toggle("hidden", show);
+    preview.classList.toggle("hidden", !show);
+    if (show) {
+      fillPreview(form);
+      preview.focus();
+    }
+  }
 
   function handleTicketForm(form) {
     var submit = form.querySelector("#ticket-submit");
     var errorBox = form.querySelector("#ticket-error");
+    var back = form.querySelector("#ticket-preview-back");
+
+    if (back) {
+      back.addEventListener("click", function () {
+        previewConfirmed = false;
+        showPreview(form, false);
+      });
+    }
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       if (errorBox) errorBox.classList.add("hidden");
-      setBusy(submit, true);
 
+      // Étape 1 → 2 : aucun envoi tant que l'étudiant n'a pas confirmé.
+      if (!previewConfirmed) {
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+        previewConfirmed = true;
+        showPreview(form, true);
+        return;
+      }
+
+      setBusy(submit, true);
       api
         .apiFetch(form.getAttribute("data-create-url"), {
           method: "POST",
           body: new FormData(form),
         })
         .then(function (result) {
+          previewConfirmed = false;
           api.closeModal();
           api.showNotification(result.data.message || "Requête envoyée.", "success");
           var feed = form.getAttribute("data-feed-url");
           if (feed) api.loadFragment(feed, { pushState: false });
         })
         .catch(function (err) {
+          previewConfirmed = false;
+          showPreview(form, false);
           var payload = err.data || {};
           var message = payload.message || err.message || "Envoi impossible.";
-          if (errorBox) {
-            errorBox.textContent = message;
-            errorBox.classList.remove("hidden");
-          }
+          errorBoxOf(errorBox, message);
           api.showNotification(message, "error");
         })
         .then(function () {
           setBusy(submit, false);
         });
     });
+  }
+
+  /* -------------------- RÉPONSE ÉTUDIANT (MORE_INFO) -------------------- */
+
+  function handleReplyForm(form) {
+    var errorBox = form.querySelector("#reply-error");
+    var submit = form.querySelector('[type="submit"]');
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (errorBox) errorBox.classList.add("hidden");
+      var body = form.querySelector('[name="body"]');
+      if (!body.value.trim()) {
+        errorBoxOf(errorBox, "Votre réponse est obligatoire.");
+        body.focus();
+        return;
+      }
+      setBusy(submit, true);
+      api
+        .apiFetch(form.getAttribute("data-reply-url"), {
+          method: "POST",
+          body: new FormData(form),
+        })
+        .then(function (result) {
+          api.showNotification(result.data.message || "Réponse transmise.", "success");
+          var detail = form.getAttribute("data-detail-url");
+          if (detail) api.loadFragment(detail, { pushState: false });
+        })
+        .catch(function (err) {
+          var payload = err.data || {};
+          var message = payload.message || err.message || "Envoi impossible.";
+          errorBoxOf(errorBox, message);
+          api.showNotification(message, "error");
+        })
+        .then(function () {
+          setBusy(submit, false);
+        });
+    });
+  }
+
+  /* -------------------- FLUX ÉTUDIANT : RECHERCHE / FILTRES -------------------- */
+
+  function handleFeedFilter(form) {
+    if (form.dataset.wired) return;
+    form.dataset.wired = "1";
+    var base = form.getAttribute("data-feed-url");
+
+    function apply() {
+      var params = new URLSearchParams();
+      var q = form.querySelector('[name="q"]');
+      var status = form.querySelector('[name="status"]');
+      if (q && q.value.trim()) params.set("q", q.value.trim());
+      if (status && status.value) params.set("status", status.value);
+      var query = params.toString();
+      api.loadFragment(base + (query ? "?" + query : ""), {
+        target: "#spa-viewport",
+        pushState: true,
+      });
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      apply();
+    });
+    var status = form.querySelector('[name="status"]');
+    if (status) status.addEventListener("change", apply);
+  }
+
+  /* -------------------- NOTIFICATIONS : MARQUAGE « LU » -------------------- */
+
+  function updateUnreadBadges(count) {
+    document.querySelectorAll("[data-unread-badge]").forEach(function (badge) {
+      if (count > 0) {
+        badge.textContent = String(count);
+        badge.classList.remove("hidden");
+      } else {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+      }
+    });
+  }
+
+  function markNotificationsRead(button) {
+    var url = button.getAttribute("data-read-url");
+    if (!url) return;
+    var ids = button.getAttribute("data-read-ids");
+    var body = new FormData();
+    if (ids) body.append("ids", ids);
+
+    api
+      .apiFetch(url, { method: "POST", body: body })
+      .then(function (result) {
+        if (typeof result.data.unread_notifications === "number") {
+          updateUnreadBadges(result.data.unread_notifications);
+        }
+        // « Tout marquer lu » (sans navigation ticket) : recharge la liste.
+        var refresh = button.getAttribute("data-refresh-url");
+        if (refresh && !button.hasAttribute("data-fragment-src")) {
+          api.loadFragment(refresh, { pushState: false });
+        }
+      })
+      .catch(function (err) {
+        api.showNotification(
+          (err.data && err.data.message) || err.message || "Action impossible.",
+          "error"
+        );
+      });
   }
 
   /* --------------------------- ENSEIGNANT --------------------------- */
@@ -69,12 +292,13 @@
     if (lastDetailUrl) loadDetail(lastDetailUrl);
   }
 
-  function submitStatus(button, status, reason) {
+  function submitStatus(button, status, reason, moreInfo) {
     var url = button.getAttribute("data-status-url");
     var body = new FormData();
     body.append("ticket_id", button.getAttribute("data-ticket-id"));
     body.append("status", status);
     if (reason) body.append("rejection_reason", reason);
+    if (moreInfo) body.append("more_info_request", moreInfo);
 
     setBusy(button, true);
     return api
@@ -104,12 +328,17 @@
       var status = form.querySelector('[name="status"]').value;
       var reasonField = form.querySelector('[name="rejection_reason"]');
       var reason = reasonField ? reasonField.value.trim() : "";
+      var infoField = form.querySelector('[name="more_info_request"]');
+      var moreInfo = infoField ? infoField.value.trim() : "";
 
       if (status === "REJECTED" && !reason) {
-        if (errorBox) {
-          errorBox.textContent = "Le motif du rejet est obligatoire.";
-          errorBox.classList.remove("hidden");
-        }
+        errorBoxOf(errorBox, "Le motif du rejet est obligatoire.");
+        if (reasonField) reasonField.focus();
+        return;
+      }
+      if (status === "MORE_INFO" && !moreInfo) {
+        errorBoxOf(errorBox, "La question posée à l'étudiant est obligatoire.");
+        if (infoField) infoField.focus();
         return;
       }
       var fakeButton = submit;
@@ -117,7 +346,7 @@
       fakeButton.setAttribute("data-ticket-id", form.querySelector('[name="ticket_id"]').value);
       setBusy(submit, true);
 
-      submitStatus(fakeButton, status, reason).then(function () {
+      submitStatus(fakeButton, status, reason, moreInfo).then(function () {
         setBusy(submit, false);
       });
     });
@@ -136,13 +365,41 @@
       decisionForm.dataset.wired = "1";
       handleDecisionForm(decisionForm);
     }
+    var replyForm = root.querySelector("#student-reply-form");
+    if (replyForm && !replyForm.dataset.wired) {
+      replyForm.dataset.wired = "1";
+      handleReplyForm(replyForm);
+    }
+    var feedFilter = root.querySelector("#feed-filter");
+    if (feedFilter) handleFeedFilter(feedFilter);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     wire(document);
   });
 
+  // Fragments injectés dans #spa-viewport (navigation sans rechargement).
+  api.onContentLoaded = (function (previous) {
+    return function (body) {
+      if (typeof previous === "function") previous(body);
+      wire(body);
+    };
+  })(api.onContentLoaded);
+
+  var previousHook = api.onModalContentLoaded;
+  api.onModalContentLoaded = function (body) {
+    if (typeof previousHook === "function") previousHook(body);
+    wire(body);
+  };
+
   document.addEventListener("click", function (event) {
+    var read = event.target.closest("[data-notifications-read]");
+    if (read) {
+      markNotificationsRead(read);
+      if (!read.hasAttribute("data-fragment-src")) event.preventDefault();
+      if (read.hasAttribute("data-fragment-src")) return; // la navigation gère le reste
+    }
+
     var toggle = event.target.closest("[data-toggle-reason]");
     if (toggle) {
       event.preventDefault();
@@ -164,13 +421,7 @@
     var action = event.target.closest("[data-status-action]");
     if (action) {
       event.preventDefault();
-      submitStatus(action, action.getAttribute("data-status-action"), null);
+      submitStatus(action, action.getAttribute("data-status-action"), null, null);
     }
   });
-
-  var previousHook = api.onModalContentLoaded;
-  api.onModalContentLoaded = function (body) {
-    if (typeof previousHook === "function") previousHook(body);
-    wire(body);
-  };
 })();

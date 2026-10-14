@@ -1,0 +1,81 @@
+{% load i18n %}
+{# Centre de notifications — liste horodatée + action « tout marquer comme lu » #}
+<div class="rise space-y-4">
+    <div class="flex items-center justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-bold text-navy-dark">{% trans "Notifications" %}</h2>
+            <p class="text-sm text-slate-500">
+                {% if unread_count %}
+                    {% blocktrans count counter=unread_count %}
+                        Une notification non lue.
+                    {% plural %}
+                        {{ counter }} notifications non lues.
+                    {% endblocktrans %}
+                {% else %}
+                    {% trans "Tout est lu." %}
+                {% endif %}
+            </p>
+        </div>
+        {% if unread_count %}
+            <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                    data-notifications-read
+                    data-read-url="{% url 'accounts:notifications_read' %}"
+                    data-refresh-url="{% url 'accounts:notifications' %}">
+                {% trans "Tout marquer lu" %}
+            </button>
+        {% endif %}
+    </div>
+
+    {% if notifications %}
+        <ul class="space-y-2">
+            {% for notification in notifications %}
+                <li>
+                    <button type="button"
+                            class="ticket-card w-full text-left"
+                            data-status="{% if notification.is_read %}SENT{% else %}RECEIVED{% endif %}"
+                            {% if notification.ticket_id %}
+                                data-fragment-src="{% if role == 'teacher' %}{% url 'tickets:ticket_detail' notification.ticket_id %}{% else %}{% url 'tickets:student_ticket_detail' notification.ticket_id %}{% endif %}"
+                                data-notif-id="{{ notification.id }}"
+                            {% endif %}
+                            data-notifications-read
+                            data-read-url="{% url 'accounts:notifications_read' %}"
+                            data-refresh-url="{% url 'accounts:notifications' %}"
+                            data-read-ids="{{ notification.id }}">
+                        <span class="flex items-start justify-between gap-3">
+                            <span class="min-w-0">
+                                <span class="block font-semibold text-navy-dark truncate">
+                                    {{ notification.title }}
+                                </span>
+                                <span class="block text-xs text-slate-500 mt-0.5 truncate">
+                                    {{ notification.body }}
+                                </span>
+                            </span>
+                            {% if not notification.is_read %}
+                                <span class="shrink-0 w-2.5 h-2.5 rounded-full bg-navy-600 mt-1.5"
+                                      aria-label="{% trans 'Non lue' %}"></span>
+                            {% endif %}
+                        </span>
+                        <span class="mt-2 block text-xs text-slate-400">
+                            {{ notification.created_at|date:"d/m/Y H:i" }}
+                        </span>
+                    </button>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="card p-10 text-center">
+            <span class="mx-auto w-14 h-14 rounded-2xl bg-navy-50 text-navy flex items-center justify-center" aria-hidden="true">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                </svg>
+            </span>
+            <p class="mt-4 text-base font-semibold text-navy-dark">
+                {% trans "Aucune notification." %}
+            </p>
+            <p class="mt-1 text-sm text-slate-500">
+                {% trans "Vous serez prévenu des changements sur vos requêtes." %}
+            </p>
+        </div>
+    {% endif %}
+</div>

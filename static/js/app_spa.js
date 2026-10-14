@@ -201,6 +201,9 @@
           history.pushState({ fragment: url }, "", url);
         }
         if (opts.onLoaded) opts.onLoaded(target);
+        if (typeof window.UnivReq.onContentLoaded === "function") {
+          window.UnivReq.onContentLoaded(target);
+        }
       })
       .catch(function (err) {
         target.setAttribute("aria-busy", "false");
@@ -320,7 +323,10 @@
     // y dupliquerait navbar et footer. Là-bas, le navigateur gère l'ancre
     // nativement — aucun swap de fragment.
     if (!document.getElementById("spa-config")) return;
-    loadFragment(window.location.pathname, { pushState: false });
+    // pathname + search : conserve les filtres/pagination du flux étudiant.
+    loadFragment(window.location.pathname + window.location.search, {
+      pushState: false,
+    });
   }
 
   /* ------------------------------------------------------------------ */

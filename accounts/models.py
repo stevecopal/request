@@ -222,3 +222,47 @@ class PushSubscription(UUIDModel):
 
     def __str__(self):
         return f"Push({self.user.username}) {self.endpoint[:40]}"
+
+
+class Notification(UUIDModel):
+    """
+    Notification centre d'un utilisateur (compteur de non-lus + accès direct
+    à la requête concernée). Alimentée après commit transactionnel.
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        verbose_name=_("user"),
+    )
+    ticket = models.ForeignKey(
+        "tickets.Ticket",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+        verbose_name=_("ticket"),
+    )
+    title = models.CharField(_("title"), max_length=150)
+    body = models.TextField(_("body"), blank=True)
+    is_read = models.BooleanField(_("is read"), default=False)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("notification")
+        verbose_name_plural = _("notifications")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["user", "is_read", "created_at"], name="notif_user_read_idx"
+            ),
+            models.Index(fields=["user", "created_at"], name="notif_user_created_idx"),
+        ]
+
+    @property
+    def ticket_id_str(self) -> str:
+        return str(self.ticket_id) if self.ticket_id else ""
+
+    def __str__(self):
+        return f"Notif({self.user.username}) {self.title[:40]}"

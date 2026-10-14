@@ -16,7 +16,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from accounts.models import Department, Faculty, Student, Teacher, University
-from core_scolarite.models import AttachmentConfig, Course, ProblemType
+from core_scolarite.models import AttachmentConfig, Course, Enrollment, ProblemType
 
 DEFAULT_UNIVERSITY = "Université Nationale"
 
@@ -53,6 +53,12 @@ PROBLEM_TYPES = [
 STUDENTS = [
     ("ETU001", "Alice", "Kamga", "alice.kamga@univ.example", "Faculté des Sciences", "Informatique"),
     ("ETU002", "Brice", "Tchoumi", "brice.tchoumi@univ.example", "Faculté des Sciences", "Mathématiques"),
+]
+
+# (matricule étudiant, code UE, année académique)
+ENROLLMENTS = [
+    ("ETU001", "INF101", "2025-2026"),
+    ("ETU002", "MAT210", "2025-2026"),
 ]
 
 
@@ -134,6 +140,19 @@ class Command(BaseCommand):
                     "department": dept,
                 },
             )
+
+        # ── Inscriptions (filtrage du formulaire dynamique) ──────────────
+        for matricule, course_code, academic_year in ENROLLMENTS:
+            student = Student.objects.filter(
+                user__username=matricule
+            ).first()
+            course = Course.objects.filter(code=course_code).first()
+            if student and course:
+                Enrollment.objects.get_or_create(
+                    student=student,
+                    course=course,
+                    defaults={"academic_year": academic_year},
+                )
 
         # ── Super-admin ──────────────────────────────────────────────────
         admin_user, created = User.objects.get_or_create(

@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET
 
 from accounts.decorators import student_required
 from accounts.models import Teacher
-from core_scolarite.models import Course, ProblemType
+from core_scolarite.models import Course, Enrollment, ProblemType
 
 
 def _teacher_label(title_label, first_name, last_name, username):
@@ -54,12 +54,23 @@ def form_config(request):
         )
 
     courses = []
+    enrollment_filtered = False
     if problem_type.requires_course:
-        courses = list(
-            Course.objects.filter(department_id=student.department_id)
-            .values("id", "code", "name")
-            .order_by("code")
-        )
+        # Filtre par inscriptions réelles quand elles existent, sinon repli
+        # sur le département de l'étudiant (mode MVP).
+        if Enrollment.objects.filter(student=student).exists():
+            enrollment_filtered = True
+            courses = list(
+                Course.objects.filter(enrollments__student=student)
+                .values("id", "code", "name")
+                .order_by("code")
+            )
+        else:
+            courses = list(
+                Course.objects.filter(department_id=student.department_id)
+                .values("id", "code", "name")
+                .order_by("code")
+            )
 
     title_labels = dict(Teacher.TITLE_CHOICES)
     teachers = [
@@ -85,6 +96,7 @@ def form_config(request):
         {
             "status": "success",
             "requires_course": problem_type.requires_course,
+            "enrollment_filtered": enrollment_filtered,
             "problem_type": {
                 "id": problem_type.id,
                 "name": problem_type.name,

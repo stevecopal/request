@@ -34,6 +34,7 @@ def create_ticket(request):
             uploaded_files_dict=uploaded_files,
             course_id=request.POST.get("course_id") or None,
             teacher_id=request.POST.get("teacher_id") or None,
+            academic_year=request.POST.get("academic_year", ""),
         )
     except TicketCreationError as exc:
         return JsonResponse(

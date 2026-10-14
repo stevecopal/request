@@ -22,9 +22,10 @@ from tickets.services.status_machine import apply_status
 STATUS_PRIORITY = Case(
     When(status=Ticket.Status.SENT, then=Value(0)),
     When(status=Ticket.Status.RECEIVED, then=Value(1)),
-    When(status=Ticket.Status.PROCESSING, then=Value(2)),
-    When(status=Ticket.Status.REJECTED, then=Value(3)),
-    When(status=Ticket.Status.RESOLVED, then=Value(4)),
+    When(status=Ticket.Status.MORE_INFO, then=Value(2)),
+    When(status=Ticket.Status.PROCESSING, then=Value(3)),
+    When(status=Ticket.Status.REJECTED, then=Value(4)),
+    When(status=Ticket.Status.RESOLVED, then=Value(5)),
     output_field=IntegerField(),
 )
 
@@ -78,10 +79,15 @@ def _get_accessible_ticket(request, pk):
 
 @teacher_required
 def teacher_decision_modal(request):
-    """Fragment de la modale de décision (Valider / Rejeter) d'un ticket."""
+    """Fragment de la modale de décision (Valider / Rejeter / Plus d'infos)."""
     ticket_id = request.GET.get("ticket_id")
     target = request.GET.get("target")
-    if target not in (Ticket.Status.RESOLVED, Ticket.Status.REJECTED):
+    allowed_targets = (
+        Ticket.Status.RESOLVED,
+        Ticket.Status.REJECTED,
+        Ticket.Status.MORE_INFO,
+    )
+    if target not in allowed_targets:
         return JsonResponse(
             {"status": "error", "message": str(_("Cible de décision invalide."))},
             status=400,

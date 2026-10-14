@@ -1,11 +1,11 @@
 {% load i18n %}
-{# Flux étudiant — cartes de requête avec rail de statut et collapse du rejet #}
+{# Flux étudiant — recherche, filtre de statut, pagination, cartes de requête #}
 <div class="rise space-y-4">
     <div class="flex items-center justify-between gap-3">
         <div>
             <h2 class="text-xl font-bold text-navy-dark">{% trans "Mes requêtes" %}</h2>
             <p class="text-sm text-slate-500">
-                {{ tickets|length }} {% if tickets|length > 1 %}{% trans "requêtes déposées" %}{% else %}{% trans "requête déposée" %}{% endif %}
+                {{ total_count }} {% if total_count > 1 %}{% trans "requêtes déposées" %}{% else %}{% trans "requête déposée" %}{% endif %}
             </p>
         </div>
         <button type="button" class="btn btn-primary !w-auto !min-h-11 px-4 text-sm"
@@ -15,6 +15,31 @@
         </button>
     </div>
 
+    {# Recherche + filtre de statut (appliqués sans rechargement de page) #}
+    <form id="feed-filter" class="space-y-2" role="search"
+          data-feed-url="{% url 'tickets:student_feed' %}">
+        <div class="flex gap-2">
+            <label class="sr-only" for="feed-q">{% trans "Rechercher" %}</label>
+            <input class="field !min-h-11" type="search" id="feed-q" name="q"
+                   value="{{ query }}"
+                   placeholder="{% trans 'Rechercher (description, UE…)' %}">
+            <button type="submit" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm">
+                {% trans "OK" %}
+            </button>
+        </div>
+        <div>
+            <label class="sr-only" for="feed-status">{% trans "Filtrer par statut" %}</label>
+            <select class="field !min-h-11" id="feed-status" name="status" data-feed-autosubmit>
+                <option value="">{% trans "Tous les statuts" %}</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if active_status == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
     {% if tickets %}
         <ul class="space-y-3">
             {% for ticket in tickets %}
@@ -22,26 +47,31 @@
                     <article class="ticket-card"
                              data-ticket-id="{{ ticket.id }}"
                              data-status="{{ ticket.status }}">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="font-semibold text-navy-dark truncate">
-                                    {{ ticket.problem_type.name }}
-                                </p>
-                                <p class="text-xs text-slate-500 mt-0.5 truncate">
-                                    {% if ticket.course %}{{ ticket.course.code }} — {{ ticket.course.name }}{% else %}{% trans "Hors UE" %}{% endif %}
-                                </p>
-                            </div>
-                            {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
-                        </div>
-
-                        <p class="mt-2 text-sm text-slate-600 line-clamp-2">{{ ticket.description }}</p>
-
-                        <div class="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-400">
-                            <span>{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
-                            <span class="truncate max-w-[55%] text-right">
-                                {{ ticket.teacher.full_name }}
+                        <button type="button"
+                                class="w-full text-left"
+                                data-fragment-src="{% url 'tickets:student_ticket_detail' ticket.id %}"
+                                aria-label="{% trans 'Ouvrir le suivi de la requête' %}">
+                            <span class="flex items-start justify-between gap-3">
+                                <span class="min-w-0">
+                                    <span class="block font-semibold text-navy-dark truncate">
+                                        {{ ticket.problem_type.name }}
+                                    </span>
+                                    <span class="block text-xs text-slate-500 mt-0.5 truncate">
+                                        {% if ticket.course %}{{ ticket.course.code }} — {{ ticket.course.name }}{% else %}{% trans "Hors UE" %}{% endif %}
+                                    </span>
+                                </span>
+                                {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
                             </span>
-                        </div>
+
+                            <span class="block mt-2 text-sm text-slate-600 line-clamp-2">{{ ticket.description }}</span>
+
+                            <span class="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-400">
+                                <span>{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
+                                <span class="truncate max-w-[55%] text-right">
+                                    {{ ticket.teacher.full_name }}
+                                </span>
+                            </span>
+                        </button>
 
                         {% if ticket.status == 'REJECTED' %}
                             <button type="button"
@@ -57,11 +87,41 @@
                                  data-reason-panel>
                                 {% if ticket.rejection_reason %}{{ ticket.rejection_reason }}{% else %}{% trans "Aucun motif fourni." %}{% endif %}
                             </div>
+                        {% elif ticket.status == 'MORE_INFO' %}
+                            <div class="mt-3 rounded-xl bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
+                                {% trans "L'enseignant demande des informations complémentaires. Ouvrez la requête pour répondre." %}
+                            </div>
                         {% endif %}
                     </article>
                 </li>
             {% endfor %}
         </ul>
+
+        {# Pagination — chargée comme fragment (aucun rechargement de page) #}
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav class="flex items-center justify-between gap-2 pt-1"
+                 aria-label="{% trans 'Pagination des requêtes' %}">
+                {% if page_obj.has_previous %}
+                    <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                            data-fragment-src="?page={{ page_obj.previous_page_number }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if active_status %}&amp;status={{ active_status }}{% endif %}">
+                        {% trans "Précédent" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+                <span class="text-xs text-slate-500 tabular-nums">
+                    {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                </span>
+                {% if page_obj.has_next %}
+                    <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                            data-fragment-src="?page={{ page_obj.next_page_number }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if active_status %}&amp;status={{ active_status }}{% endif %}">
+                        {% trans "Suivant" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+            </nav>
+        {% endif %}
     {% else %}
         <div class="card p-10 text-center">
             <span class="mx-auto w-14 h-14 rounded-2xl bg-navy-50 text-navy flex items-center justify-center" aria-hidden="true">
@@ -71,16 +131,27 @@
                 </svg>
             </span>
             <p class="mt-4 text-base font-semibold text-navy-dark">
-                {% trans "Aucune requête pour le moment." %}
+                {% if query or active_status %}
+                    {% trans "Aucune requête ne correspond à votre recherche." %}
+                {% else %}
+                    {% trans "Aucune requête pour le moment." %}
+                {% endif %}
             </p>
-            <p class="mt-1 text-sm text-slate-500">
-                {% trans "Appuyez sur « Nouvelle » pour soumettre votre première requête." %}
-            </p>
-            <button type="button" class="btn btn-ghost !w-auto px-5 mt-5"
-                    data-modal-src="{% url 'tickets:student_request_modal' %}"
-                    data-modal-title="{% trans 'Nouvelle requête' %}">
-                {% trans "Créer une requête" %}
-            </button>
+            {% if query or active_status %}
+                <button type="button" class="btn btn-ghost !w-auto px-5 mt-4"
+                        data-fragment-src="{% url 'tickets:student_feed' %}">
+                    {% trans "Réinitialiser les filtres" %}
+                </button>
+            {% else %}
+                <p class="mt-1 text-sm text-slate-500">
+                    {% trans "Appuyez sur « Nouvelle » pour soumettre votre première requête." %}
+                </p>
+                <button type="button" class="btn btn-ghost !w-auto px-5 mt-5"
+                        data-modal-src="{% url 'tickets:student_request_modal' %}"
+                        data-modal-title="{% trans 'Nouvelle requête' %}">
+                    {% trans "Créer une requête" %}
+                </button>
+            {% endif %}
         </div>
     {% endif %}
 </div>

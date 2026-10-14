@@ -1,5 +1,6 @@
 {% load i18n %}
-{# Modale de décision enseignant — Valider (RESOLVED) ou Rejeter (REJECTED + motif) #}
+{# Modale de décision enseignant — Valider (RESOLVED), Rejeter (REJECTED + motif),
+   Demander des infos (MORE_INFO + question obligatoire) #}
 <form id="teacher-decision-form" class="space-y-4" novalidate
       method="post"
       action="{% url 'tickets:update_status' %}"
@@ -11,6 +12,8 @@
     <p class="text-sm text-slate-600">
         {% if target == 'RESOLVED' %}
             {% trans "Confirmez la validation de cette requête. L'étudiant en sera notifié immédiatement." %}
+        {% elif target == 'MORE_INFO' %}
+            {% trans "Décrivez les informations demandées : l'étudiant pourra vous répondre depuis son suivi." %}
         {% else %}
             {% trans "Indiquez le motif du rejet : il sera transmis à l'étudiant." %}
         {% endif %}
@@ -24,12 +27,23 @@
             <textarea class="field min-h-24" id="decision-reason" name="rejection_reason"
                       rows="3" required></textarea>
         </div>
+    {% elif target == 'MORE_INFO' %}
+        <div>
+            <label class="label" for="decision-more-info">
+                {% trans "Informations demandées" %} <span class="text-red-600" aria-hidden="true">*</span>
+            </label>
+            <textarea class="field min-h-24" id="decision-more-info" name="more_info_request"
+                      rows="3" required
+                      placeholder="{% trans 'Ex. : envoyez-moi le relevé de notes signé…' %}"></textarea>
+        </div>
     {% endif %}
 
     <p id="decision-error" class="hidden text-sm font-medium text-red-600" role="alert"></p>
 
     <button type="submit"
-            class="btn {% if target == 'RESOLVED' %}btn-success{% else %}btn-danger{% endif %}">
-        {% if target == 'RESOLVED' %}{% trans "Valider" %}{% else %}{% trans "Rejeter" %}{% endif %}
+            class="btn {% if target == 'RESOLVED' %}btn-success{% elif target == 'MORE_INFO' %}btn-primary{% else %}btn-danger{% endif %}">
+        {% if target == 'RESOLVED' %}{% trans "Valider" %}
+        {% elif target == 'MORE_INFO' %}{% trans "Envoyer la demande" %}
+        {% else %}{% trans "Rejeter" %}{% endif %}
     </button>
 </form>

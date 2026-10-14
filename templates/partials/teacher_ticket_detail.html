@@ -63,6 +63,33 @@
         </div>
     {% endif %}
 
+    {% if ticket.status == 'MORE_INFO' %}
+        <div class="rounded-xl bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
+            <span class="font-semibold">{% trans "Question envoyée à l'étudiant" %} :</span>
+            <span class="whitespace-pre-line">{{ ticket.complementary_info_request }}</span>
+        </div>
+    {% endif %}
+
+    {# Échanges (réponses de l'étudiant, messages de l'enseignant) #}
+    {% if ticket.comments.all %}
+        <div>
+            <p class="text-sm font-semibold text-navy-dark">{% trans "Échanges" %}</p>
+            <ul class="mt-2 space-y-2">
+                {% for comment in ticket.comments.all %}
+                    <li class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="font-medium text-navy-dark">{{ comment.author_label }}</span>
+                            <time class="text-xs text-slate-500" datetime="{{ comment.created_at|date:'c' }}">
+                                {{ comment.created_at|date:"d/m/Y H:i" }}
+                            </time>
+                        </div>
+                        <p class="text-xs text-slate-600 mt-1 whitespace-pre-line">{{ comment.body }}</p>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
     {# Historique horodaté des décisions et changements de statut #}
     {% if ticket.status_history.all %}
         <div>
@@ -99,6 +126,31 @@
                 {% trans "Démarrer l'analyse" %}
             </button>
         {% elif ticket.status == 'PROCESSING' %}
+            <button type="button" class="btn btn-primary"
+                    data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=MORE_INFO"
+                    data-modal-title="{% trans 'Demander des informations' %}">
+                {% trans "Demander des informations" %}
+            </button>
+            <button type="button" class="btn btn-success"
+                    data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=RESOLVED"
+                    data-modal-title="{% trans 'Valider la requête' %}">
+                {% trans "Valider" %}
+            </button>
+            <button type="button" class="btn btn-danger"
+                    data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=REJECTED"
+                    data-modal-title="{% trans 'Rejeter la requête' %}">
+                {% trans "Rejeter" %}
+            </button>
+        {% elif ticket.status == 'MORE_INFO' %}
+            <p class="text-xs text-slate-500 text-center">
+                {% trans "En attente de la réponse de l'étudiant." %}
+            </p>
+            <button type="button" class="btn btn-ghost"
+                    data-status-action="PROCESSING"
+                    data-ticket-id="{{ ticket.id }}"
+                    data-status-url="{% url 'tickets:update_status' %}">
+                {% trans "Reprendre l'analyse" %}
+            </button>
             <button type="button" class="btn btn-success"
                     data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=RESOLVED"
                     data-modal-title="{% trans 'Valider la requête' %}">

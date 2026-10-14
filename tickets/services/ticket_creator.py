@@ -19,7 +19,7 @@ from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Teacher
-from core_scolarite.models import AttachmentConfig, Course, ProblemType
+from core_scolarite.models import AttachmentConfig, Course, Enrollment, ProblemType
 from tickets.models import Ticket, TicketAttachment, TicketStatusHistory
 
 
@@ -59,7 +59,17 @@ def _resolve_teacher(student_profile, problem_type, course, teacher_id):
                 _("Veuillez sélectionner une unité d'enseignement."),
                 {"course": _("Champ obligatoire.")},
             )
-        if course.department_id != student_profile.department_id:
+        # Filtrage par inscriptions réelles quand elles existent, sinon département.
+        has_enrollments = Enrollment.objects.filter(student=student_profile).exists()
+        if has_enrollments:
+            enrolled = Enrollment.objects.filter(
+                student=student_profile, course=course
+            ).exists()
+            if not enrolled:
+                raise TicketCreationError(
+                    _("Vous n'êtes pas inscrit à cette unité d'enseignement.")
+                )
+        elif course.department_id != student_profile.department_id:
             raise TicketCreationError(
                 _("L'unité d'enseignement sélectionnée n'appartient pas à votre département.")
             )
@@ -67,6 +77,14 @@ def _resolve_teacher(student_profile, problem_type, course, teacher_id):
         if teacher is None:
             raise TicketCreationError(
                 _("Aucun enseignant n'est assigné à cette unité d'enseignement.")
+            )
+        # Garde-fou : l'enseignant assigné doit appartenir au même département.
+        if (
+            student_profile.department_id
+            and teacher.department_id != student_profile.department_id
+        ):
+            raise TicketCreationError(
+                _("L'enseignant assigné à cette unité n'appartient pas à votre département.")
             )
         return teacher
 
@@ -93,6 +111,7 @@ def create_student_ticket(
     uploaded_files_dict,
     course_id=None,
     teacher_id=None,
+    academic_year="",
 ) -> Ticket:
     """
     Crée un ticket pour l'étudiant fourni.
@@ -103,6 +122,7 @@ def create_student_ticket(
     :param uploaded_files_dict: {str(attachment_config_id): UploadedFile}.
     :param course_id: id de l'UE (si le problème l'exige).
     :param teacher_id: id de l'enseignant (si le problème n'exige pas d'UE).
+    :param academic_year: session académique déclarée (ex. 2025-2026).
     :return: le Ticket créé.
     :raises TicketCreationError: validation échouée (aucune écriture persistée).
     """
@@ -145,14 +165,19 @@ def create_student_ticket(
         if uploaded is not None:
             _validate_file(uploaded, config.label)
 
-    ticket = Ticket.objects.create(
+    ticket = Ticket(
         student=student_profile,
         teacher=teacher,
         course=course,
         problem_type=problem_type,
         description=description,
+        academic_year=(academic_year or "").strip()[:9],
         status=Ticket.Status.SENT,
     )
+    # L'étudiant est l'acteur : il ne reçoit pas de notification pour sa propre
+    # soumission (posé avant save pour le signal post_save).
+    ticket._actor_user_id = student_profile.user_id
+    ticket.save()
 
     written_files = []
     try:

@@ -36,6 +36,7 @@ class Ticket(UUIDModel):
         SENT = "SENT", _("Envoyé")
         RECEIVED = "RECEIVED", _("Reçu")
         PROCESSING = "PROCESSING", _("En cours")
+        MORE_INFO = "MORE_INFO", _("Infos demandées")
         RESOLVED = "RESOLVED", _("Résolu")
         REJECTED = "REJECTED", _("Rejeté")
 
@@ -66,6 +67,12 @@ class Ticket(UUIDModel):
         verbose_name=_("problem type"),
     )
     description = models.TextField(_("description"))
+    academic_year = models.CharField(
+        _("academic year"),
+        max_length=9,
+        blank=True,
+        help_text=_("Session académique concernée, ex. 2025-2026."),
+    )
     status = models.CharField(
         _("status"),
         max_length=15,
@@ -73,6 +80,10 @@ class Ticket(UUIDModel):
         default=Status.SENT,
     )
     rejection_reason = models.TextField(_("rejection reason"), null=True, blank=True)
+    # Demande d'informations complémentaires (enseignant → étudiant).
+    complementary_info_request = models.TextField(
+        _("complementary info request"), blank=True
+    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
     # Horodatages d'analytique (§6.3) : sans eux, impossible de calculer le
@@ -111,6 +122,47 @@ class Ticket(UUIDModel):
 
     def __str__(self):
         return f"{self.problem_type} — {self.student.full_name} [{self.get_status_display()}]"
+
+
+class TicketComment(UUIDModel):
+    """
+    Commentaire horodaté sur un ticket (réponse de l'étudiant à une demande
+    d'informations complémentaires, ou message de l'enseignant).
+    """
+
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        verbose_name=_("ticket"),
+    )
+    author = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("author"),
+    )
+    body = models.TextField(_("body"))
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("ticket comment")
+        verbose_name_plural = _("ticket comments")
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["ticket", "created_at"], name="tc_ticket_created_idx"),
+        ]
+
+    @property
+    def author_label(self) -> str:
+        if self.author is None:
+            return str(_("Inconnu"))
+        return self.author.get_full_name() or self.author.username
+
+    def __str__(self):
+        return f"Commentaire {self.ticket.short_id} — {self.created_at:%d/%m/%Y %H:%M}"
 
 
 class TicketAttachment(UUIDModel):

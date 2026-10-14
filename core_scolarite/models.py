@@ -44,6 +44,50 @@ class Course(UUIDModel):
         return f"[{self.code}] {self.name}"
 
 
+class Enrollment(UUIDModel):
+    """
+    Inscription réelle d'un étudiant à une UE (référence de filtrage du
+    formulaire dynamique). En l'absence d'inscriptions, le repli s'effectue
+    sur le département de l'étudiant (mode MVP).
+    """
+
+    student = models.ForeignKey(
+        "accounts.Student",
+        on_delete=models.CASCADE,
+        related_name="enrollments",
+        verbose_name=_("student"),
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="enrollments",
+        verbose_name=_("course"),
+    )
+    academic_year = models.CharField(
+        _("academic year"),
+        max_length=9,
+        blank=True,
+        help_text=_("ex. 2025-2026"),
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("enrollment")
+        verbose_name_plural = _("enrollments")
+        ordering = ["course__code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "course"], name="enrollment_student_course_uniq"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["student"], name="enroll_student_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.student.registration_number} → {self.course.code}"
+
+
 class ProblemType(UUIDModel):
     """
     Type de problème = règle de comportement du formulaire dynamique.

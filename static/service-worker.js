@@ -22,7 +22,13 @@ const SHELL_ASSETS = [
   "/static/icons/icon-192.png",
 ];
 
-const NETWORK_FIRST_PATHS = ["/tickets/", "/tickets/teacher/", "/scolarite/admin/analytics/"];
+const NETWORK_FIRST_PATHS = [
+  "/tickets/",
+  "/tickets/accueil/",
+  "/tickets/teacher/",
+  "/accounts/notifications/",
+  "/scolarite/admin/analytics/",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

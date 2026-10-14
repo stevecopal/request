@@ -255,6 +255,7 @@
   }
   .ticket-card[data-status="RECEIVED"]::before { @apply bg-blue-600; }
   .ticket-card[data-status="PROCESSING"]::before { @apply bg-amber-500; }
+  .ticket-card[data-status="MORE_INFO"]::before { @apply bg-violet-600; }
   .ticket-card[data-status="RESOLVED"]::before { @apply bg-emerald-600; }
   .ticket-card[data-status="REJECTED"]::before { @apply bg-red-600; }
 
