@@ -47,10 +47,15 @@ def admin_import_upload(request):
     entity = request.POST.get("entity", "students")
     # `strict_placement` : case cochée ⇒ rattachement faculté/département exigé.
     strict_placement = request.POST.get("strict_placement") in ("true", "on", "1")
+    # Université cible de l'import (défaut : université par défaut configurée).
+    university = request.POST.get("university") or None
 
     try:
         imported_count = import_users(
-            upload, entity=entity, strict_placement=strict_placement
+            upload,
+            entity=entity,
+            strict_placement=strict_placement,
+            university=university,
         )
     except ImportValidationError as exc:
         return JsonResponse(

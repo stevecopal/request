@@ -15,8 +15,10 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from accounts.models import Department, Faculty, Student, Teacher
+from accounts.models import Department, Faculty, Student, Teacher, University
 from core_scolarite.models import AttachmentConfig, Course, ProblemType
+
+DEFAULT_UNIVERSITY = "Université Nationale"
 
 # (faculté, [départements])
 STRUCTURE = [
@@ -65,10 +67,13 @@ class Command(BaseCommand):
         def temp_password(matricule):
             return pattern.format(matricule=matricule, year=year)
 
-        # ── Facultés & départements ──────────────────────────────────────
+        # ── Université & facultés/départements ───────────────────────────
+        university, _ = University.objects.get_or_create(name=DEFAULT_UNIVERSITY)
         departments = {}
         for faculty_name, dept_names in STRUCTURE:
-            faculty, _ = Faculty.objects.get_or_create(name=faculty_name)
+            faculty, _ = Faculty.objects.get_or_create(
+                university=university, name=faculty_name
+            )
             for dept_name in dept_names:
                 dept, _ = Department.objects.get_or_create(
                     faculty=faculty, name=dept_name

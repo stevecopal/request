@@ -2,7 +2,19 @@
 
 from django.contrib import admin
 
-from .models import Ticket, TicketAttachment
+from .models import Ticket, TicketAttachment, TicketStatusHistory
+
+
+class TicketStatusHistoryInline(admin.TabularInline):
+    model = TicketStatusHistory
+    extra = 0
+    can_delete = False
+    fields = ("from_status", "to_status", "actor", "actor_role", "note", "created_at")
+    readonly_fields = fields
+    ordering = ("created_at",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 class TicketAttachmentInline(admin.TabularInline):
@@ -25,7 +37,7 @@ class TicketAdmin(admin.ModelAdmin):
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
     readonly_fields = ("id", "created_at", "updated_at")
-    inlines = (TicketAttachmentInline,)
+    inlines = (TicketAttachmentInline, TicketStatusHistoryInline)
     fieldsets = (
         (None, {"fields": ("id", "status", "problem_type", "description")}),
         ("Acteurs", {"fields": ("student", "teacher", "course")}),
@@ -36,3 +48,19 @@ class TicketAdmin(admin.ModelAdmin):
     @admin.display(description="Référence")
     def short_id(self, obj):
         return obj.short_id
+
+
+@admin.register(TicketStatusHistory)
+class TicketStatusHistoryAdmin(admin.ModelAdmin):
+    list_display = ("ticket", "from_status", "to_status", "actor", "actor_role", "created_at")
+    list_filter = ("to_status", "actor_role")
+    search_fields = ("ticket__student__registration_number", "note")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+    readonly_fields = [f.name for f in TicketStatusHistory._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

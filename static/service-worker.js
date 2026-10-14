@@ -87,3 +87,36 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+/* ── Web Push : notifications hors-page (distinctes des WebSockets) ────── */
+
+self.addEventListener("push", (event) => {
+  let payload = { title: "UnivReq", body: "", tag: "univreq", url: "/dashboard/" };
+  try {
+    if (event.data) payload = Object.assign(payload, event.data.json());
+  } catch (e) {
+    if (event.data) payload.body = event.data.text();
+  }
+  event.waitUntil(
+    self.registration.showNotification(payload.title || "UnivReq", {
+      body: payload.body || "",
+      tag: payload.tag || "univreq",
+      icon: "/static/icons/icon-192.png",
+      badge: "/static/icons/icon-192.png",
+      data: { url: payload.url || "/dashboard/" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/dashboard/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client) return client.focus();
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});

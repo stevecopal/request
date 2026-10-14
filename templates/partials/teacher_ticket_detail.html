@@ -63,6 +63,32 @@
         </div>
     {% endif %}
 
+    {# Historique horodaté des décisions et changements de statut #}
+    {% if ticket.status_history.all %}
+        <div>
+            <p class="text-sm font-semibold text-navy-dark">{% trans "Historique" %}</p>
+            <ol class="mt-2 space-y-2">
+                {% for entry in ticket.status_history.all %}
+                    <li class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="font-medium text-navy-dark">{{ entry.to_status_label }}</span>
+                            <time class="text-xs text-slate-500" datetime="{{ entry.created_at|date:'c' }}">
+                                {{ entry.created_at|date:"d/m/Y H:i" }}
+                            </time>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            {{ entry.actor_label }} ·
+                            {% if entry.from_status %}{{ entry.from_status_label }} → {{ entry.to_status_label }}{% else %}{% trans "Création" %}{% endif %}
+                        </p>
+                        {% if entry.note %}
+                            <p class="text-xs text-slate-600 mt-1">{{ entry.note }}</p>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
     {# Actions de décision (bas de carte) #}
     <div class="pt-1 space-y-2">
         {% if ticket.status == 'RECEIVED' %}

@@ -3,7 +3,8 @@ Formulaires accounts — connexion matricule + mot de passe, onboarding MVP.
 
 `LoginForm` : le matricule est le `username` Django des deux rôles (§6.1).
 `OnboardingForm` : cascade Faculté → Département, validée côté serveur (le
-département doit appartenir à la faculté choisie).
+département doit appartenir à la faculté choisie). MVP : université unique —
+l'université du profil est toujours dérivée de la faculté.
 """
 
 from django import forms
@@ -87,6 +88,7 @@ class OnboardingForm(forms.Form):
     def save(self):
         """Applique le rattachement sur le profil passé en constructeur."""
         student = self.student
+        # L'université est toujours dérivée de la faculté (jamais d'ID client).
         student.faculty = self.cleaned_data["faculty"]
         student.department = self.cleaned_data["department"]
         student.save(update_fields=["faculty", "department"])

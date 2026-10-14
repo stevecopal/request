@@ -1,10 +1,12 @@
 """
 Modèles d'identité — accounts (ARCHITECTURE §6.1).
 
-Hiérarchie : Faculty 1─n Department ; Student/Teacher 1─1 User.
+Hiérarchie : University 1─n Faculty 1─n Department ; Student/Teacher 1─1 User.
 Clé primaire : UUID (core.models.UUIDModel).
 `Student.faculty/department` sont nullables pour supporter le Cas A (MVP
 onboarding déclaratif) ; le Cas B (LDAP/API) les renseigne à l'import.
+L'université d'un profil est toujours dérivée de sa faculté (isolation
+multi-universités structurelle : department → faculty → university).
 """
 
 from django.contrib.auth.models import User
@@ -14,18 +16,47 @@ from django.utils.translation import gettext_lazy as _
 from core.models import UUIDModel
 
 
-class Faculty(UUIDModel):
-    """Faculté (ex. « Faculté des Sciences »)."""
+class University(UUIDModel):
+    """Université — racine de l'arbre académique (isolation multi-tenants)."""
 
     name = models.CharField(_("name"), max_length=150, unique=True)
+
+    class Meta:
+        verbose_name = _("university")
+        verbose_name_plural = _("universities")
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Faculty(UUIDModel):
+    """Faculté (ex. « Faculté des Sciences ») rattachée à une université."""
+
+    university = models.ForeignKey(
+        University,
+        on_delete=models.PROTECT,
+        related_name="faculties",
+        verbose_name=_("university"),
+    )
+    name = models.CharField(_("name"), max_length=150)
 
     class Meta:
         verbose_name = _("faculty")
         verbose_name_plural = _("Faculties")
         ordering = ["name"]
+        # Un nom de faculté n'est unique que sein de son université (multi-uni)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["university", "name"], name="faculty_university_name_uniq"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["university", "name"], name="fac_uni_name_idx"),
+        ]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.university.name})"
 
 
 class Department(UUIDModel):
@@ -99,6 +130,11 @@ class Student(UUIDModel):
         return self.faculty_id is not None and self.department_id is not None
 
     @property
+    def university(self) -> University | None:
+        """Université dérivée de la faculté (None tant que non onboardé)."""
+        return self.faculty.university if self.faculty_id else None
+
+    @property
     def full_name(self) -> str:
         return self.user.get_full_name() or self.user.username
 
@@ -151,5 +187,38 @@ class Teacher(UUIDModel):
     def full_name(self) -> str:
         return f"{self.get_title_display()} {self.user.get_full_name() or self.user.username}"
 
+    @property
+    def university(self) -> University:
+        """Université dérivée de la faculté de l'enseignant."""
+        return self.faculty.university
+
     def __str__(self):
         return self.full_name
+
+
+class PushSubscription(UUIDModel):
+    """
+    Abonnement Web Push d'un appareil (distinct des WebSockets : notifie
+    l'utilisateur même lorsque la page est fermée). Un utilisateur peut
+    posséder plusieurs abonnements (plusieurs appareils).
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="push_subscriptions",
+        verbose_name=_("user"),
+    )
+    endpoint = models.URLField(_("endpoint"), max_length=500, unique=True)
+    p256dh = models.CharField(_("p256dh"), max_length=255)
+    auth = models.CharField(_("auth"), max_length=255)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("push subscription")
+        verbose_name_plural = _("push subscriptions")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Push({self.user.username}) {self.endpoint[:40]}"

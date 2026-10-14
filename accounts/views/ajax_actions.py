@@ -7,6 +7,7 @@ l'onboarding écrit exclusivement sur `request.user.student_profile`.
 """
 
 from datetime import datetime, timedelta
+import json
 
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
@@ -19,6 +20,7 @@ from django.views.decorators.http import require_GET, require_POST
 from accounts.decorators import login_required_json, student_required
 from accounts.forms import LoginForm, OnboardingForm
 from accounts.models import Department
+from accounts.services import webpush
 
 # Rate-limit simple, stocké en session (§9.2) : 5 échecs → blocage 5 minutes.
 MAX_LOGIN_ATTEMPTS = 5
@@ -138,4 +140,43 @@ def onboarding(request):
             "message": str(_("Profil complété avec succès.")),
             "next": reverse("accounts:dashboard"),
         }
+    )
+
+
+@require_POST
+@login_required_json
+def push_subscribe(request):
+    """Enregistre un abonnement Web Push pour l'utilisateur connecté."""
+    if not webpush.is_configured():
+        return _error(_("Notifications push non configurées sur ce serveur."), status=503)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return _error(_("Corps JSON invalide."))
+    subscription = payload.get("subscription")
+    if not isinstance(subscription, dict) or not subscription.get("endpoint"):
+        return _error(_("Abonnement push invalide."))
+    try:
+        webpush.save_subscription(request.user, subscription)
+    except ValueError:
+        return _error(_("Abonnement push invalide."))
+    return JsonResponse(
+        {"status": "success", "message": str(_("Notifications activées."))}
+    )
+
+
+@require_POST
+@login_required_json
+def push_unsubscribe(request):
+    """Supprime un abonnement push — uniquement celui de l'utilisateur connecté."""
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return _error(_("Corps JSON invalide."))
+    subscription = payload.get("subscription") or {}
+    endpoint = subscription.get("endpoint")
+    if isinstance(subscription, dict) and endpoint:
+        webpush.remove_subscription(request.user, subscription)
+    return JsonResponse(
+        {"status": "success", "message": str(_("Notifications désactivées."))}
     )

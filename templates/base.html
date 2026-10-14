@@ -13,6 +13,7 @@
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    {% if VAPID_PUBLIC_KEY %}<meta name="vapid-public-key" content="{{ VAPID_PUBLIC_KEY }}">{% endif %}
     <link rel="stylesheet" href="{% static 'css/output.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
@@ -81,6 +82,7 @@
     <script src="{% static 'js/ticket_form_dynamic.js' %}"></script>
     <script src="{% static 'js/ticket_lifecycle.js' %}"></script>
     <script src="{% static 'js/websocket_listener.js' %}"></script>
+    <script src="{% static 'js/webpush.js' %}"></script>
     {# Navigation publique : no-op hors landing (aucun [data-nav-toggle]). #}
     <script src="{% static 'js/public_nav.js' %}"></script>
     <script>

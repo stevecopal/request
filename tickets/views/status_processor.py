@@ -10,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import teacher_required
-from tickets.models import Ticket
+from tickets.models import Ticket, TicketStatusHistory
 from tickets.services.status_machine import StatusTransitionError, apply_status
 
 
@@ -40,7 +40,14 @@ def update_status(request):
         )
 
     try:
-        apply_status(ticket, new_status, reason=reason)
+        apply_status(
+            ticket,
+            new_status,
+            reason=reason,
+            actor=request.user,
+            actor_role=TicketStatusHistory.ActorRole.TEACHER,
+            note=(reason or "").strip(),
+        )
     except StatusTransitionError as exc:
         return JsonResponse(
             {

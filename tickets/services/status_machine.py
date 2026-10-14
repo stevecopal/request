@@ -4,14 +4,15 @@ Machine à états des tickets — tickets (ARCHITECTURE §6.4, Prompt 15).
 Transitions autorisées :
   SENT → RECEIVED → PROCESSING → {RESOLVED, REJECTED}
 Toute transition hors table est refusée. `apply_status()` pose les horodatages
-d'analytique (`received_at`, `resolved_at`) de façon atomique.
+d'analytique (`received_at`, `resolved_at`) et une entrée d'historique
+immuable (`TicketStatusHistory`) de façon atomique.
 """
 
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from tickets.models import Ticket
+from tickets.models import Ticket, TicketStatusHistory
 
 ALLOWED_TRANSITIONS = {
     Ticket.Status.SENT: [Ticket.Status.RECEIVED],
@@ -32,10 +33,20 @@ class StatusTransitionError(Exception):
 
 
 @transaction.atomic
-def apply_status(ticket: Ticket, new_status: str, reason: str | None = None) -> Ticket:
+def apply_status(
+    ticket: Ticket,
+    new_status: str,
+    reason: str | None = None,
+    actor=None,
+    actor_role: str = TicketStatusHistory.ActorRole.SYSTEM,
+    note: str = "",
+) -> Ticket:
     """
-    Applique une transition de statut validée.
+    Applique une transition de statut validée et journalise l'entrée d'historique.
 
+    :param actor: `User` ayant déclenché la transition (None = système).
+    :param actor_role: rôle de l'acteur (student/teacher/system).
+    :param note: note libre journalisée (ex. motif de rejet).
     :raises StatusTransitionError: transition invalide ou motif manquant.
     """
     allowed = ALLOWED_TRANSITIONS.get(ticket.status, [])
@@ -56,6 +67,7 @@ def apply_status(ticket: Ticket, new_status: str, reason: str | None = None) -> 
     else:
         ticket.rejection_reason = None
 
+    previous_status = ticket.status
     now = timezone.now()
     ticket.status = new_status
     if new_status == Ticket.Status.RECEIVED and ticket.received_at is None:
@@ -71,5 +83,14 @@ def apply_status(ticket: Ticket, new_status: str, reason: str | None = None) -> 
             "resolved_at",
             "updated_at",
         ]
+    )
+
+    TicketStatusHistory.objects.create(
+        ticket=ticket,
+        from_status=previous_status,
+        to_status=new_status,
+        actor=actor,
+        actor_role=actor_role,
+        note=(note or "").strip() or str(_("Statut mis à jour.")),
     )
     return ticket

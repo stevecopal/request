@@ -20,7 +20,7 @@ from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Teacher
 from core_scolarite.models import AttachmentConfig, Course, ProblemType
-from tickets.models import Ticket, TicketAttachment
+from tickets.models import Ticket, TicketAttachment, TicketStatusHistory
 
 
 class TicketCreationError(Exception):
@@ -169,5 +169,15 @@ def create_student_ticket(
         for name in written_files:
             ticket.attachments.model._meta.get_field("file").storage.delete(name)
         raise
+
+    # Historique horodaté de la création (dans la même transaction atomique).
+    TicketStatusHistory.objects.create(
+        ticket=ticket,
+        from_status=None,
+        to_status=Ticket.Status.SENT,
+        actor=student_profile.user,
+        actor_role=TicketStatusHistory.ActorRole.STUDENT,
+        note=_("Requête soumise."),
+    )
 
     return ticket

@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
 from accounts.models import Department, Faculty, Student, Teacher
+from accounts.tests.factories import make_university
 from core_scolarite.models import AttachmentConfig, Course, ProblemType
 from tickets.models import Ticket
 from tickets.services.status_machine import StatusTransitionError, apply_status
@@ -15,7 +16,8 @@ from tickets.services.ticket_creator import TicketCreationError, create_student_
 
 class BaseWorkflowTests(TestCase):
     def setUp(self):
-        self.faculty = Faculty.objects.create(name="Sciences")
+        self.university = make_university()
+        self.faculty = Faculty.objects.create(university=self.university, name="Sciences")
         self.info = Department.objects.create(faculty=self.faculty, name="Informatique")
         self.math = Department.objects.create(faculty=self.faculty, name="Mathématiques")
 

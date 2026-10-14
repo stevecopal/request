@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.translation import gettext_lazy as _
 
 from accounts.decorators import login_required_json, teacher_required
-from tickets.models import Ticket, TicketAttachment
+from tickets.models import Ticket, TicketAttachment, TicketStatusHistory
 from tickets.services.status_machine import apply_status
 
 # Priorité d'affichage : non traitées d'abord.
@@ -38,7 +38,13 @@ def teacher_inbox(request):
 
     # Acquittement automatique : SENT → RECEIVED à l'ouverture de l'inbox.
     for ticket in list(queryset.filter(status=Ticket.Status.SENT)):
-        apply_status(ticket, Ticket.Status.RECEIVED)
+        apply_status(
+            ticket,
+            Ticket.Status.RECEIVED,
+            actor=ticket.teacher.user,
+            actor_role=TicketStatusHistory.ActorRole.TEACHER,
+            note=str(_("Acquittement automatique à l'ouverture de la boîte.")),
+        )
 
     tickets = queryset.order_by(STATUS_PRIORITY, "-created_at")
     return render(request, "partials/teacher_inbox.html", {"tickets": tickets})
@@ -50,6 +56,7 @@ def _get_accessible_ticket(request, pk):
         Ticket.objects.select_related(
             "student__user", "teacher__user", "course", "problem_type"
         )
+        .prefetch_related("status_history__actor", "attachments__config")
         .filter(pk=pk)
         .first()
     )

@@ -1,5 +1,6 @@
 {% load i18n %}
 {# Modale d'onboarding (Cas A) — cascade Faculté → Département via AJAX #}
+{# MVP : université unique racine (University) — pas de choix côté étudiant. #}
 <form id="onboarding-form" class="space-y-5" novalidate
       method="post"
       action="{% url 'accounts:onboarding' %}"

@@ -11,6 +11,8 @@ Routes (ARCHITECTURE §7.1) :
   GET  /accounts/onboarding/    fragment de la modale d'onboarding
   GET  /accounts/ajax/departments/   cascade faculté → département
   POST /accounts/ajax/onboarding/    enregistrement du rattachement
+  POST /accounts/ajax/push/subscribe/   abonnement Web Push (appareil courant)
+  POST /accounts/ajax/push/unsubscribe/ désabonnement Web Push
 """
 
 from django.urls import path
@@ -29,6 +31,16 @@ urlpatterns = [
     path("accounts/onboarding/", base.onboarding_modal, name="onboarding_modal"),
     path("accounts/ajax/departments/", ajax_actions.departments, name="departments"),
     path("accounts/ajax/onboarding/", ajax_actions.onboarding, name="onboarding"),
+    path(
+        "accounts/ajax/push/subscribe/",
+        ajax_actions.push_subscribe,
+        name="push_subscribe",
+    ),
+    path(
+        "accounts/ajax/push/unsubscribe/",
+        ajax_actions.push_unsubscribe,
+        name="push_unsubscribe",
+    ),
     # PWA : service worker servi à la racine (scope « / »)
     path("service-worker.js", base.service_worker, name="service_worker"),
 ]

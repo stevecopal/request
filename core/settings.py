@@ -77,13 +77,14 @@ TEMPLATES = [
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
+            "OPTIONS": {
+                "context_processors": [
+                    "django.template.context_processors.request",
+                    "django.contrib.auth.context_processors.auth",
+                    "django.contrib.messages.context_processors.messages",
+                    "core.context_processors.vapid_public_key",
+                ],
+            },
     },
 ]
 
@@ -167,6 +168,15 @@ MAX_UPLOAD_SIZE = 8 * 1024 * 1024                    # 8 Mo par fichier
 IMPORT_DEFAULT_PASSWORD_PATTERN = config(
     "IMPORT_DEFAULT_PASSWORD_PATTERN", default="{matricule}Univ!{year}"
 )
+
+# --------------------------------------------------------------------------- #
+# Web Push (notifications hors-page, distinctes des WebSockets) — §10
+# Clés VAPID : si absentes, le push est désactivé proprement (best-effort).
+# Génération : python -m py_vapid generate --applicationServerKey
+# --------------------------------------------------------------------------- #
+VAPID_PRIVATE_KEY = config("VAPID_PRIVATE_KEY", default="")
+VAPID_PUBLIC_KEY = config("VAPID_PUBLIC_KEY", default="")
+VAPID_CLAIM_EMAIL = config("VAPID_CLAIM_EMAIL", default="admin@univ.example")
 
 # --------------------------------------------------------------------------- #
 # Fichiers statiques & médias

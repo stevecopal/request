@@ -2,14 +2,23 @@
 
 from django.contrib import admin
 
-from .models import Department, Faculty, Student, Teacher
+from .models import Department, Faculty, PushSubscription, Student, Teacher, University
+
+
+@admin.register(University)
+class UniversityAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
+    ordering = ("name",)
 
 
 @admin.register(Faculty)
 class FacultyAdmin(admin.ModelAdmin):
-    list_display = ("name",)
-    search_fields = ("name",)
-    ordering = ("name",)
+    list_display = ("name", "university")
+    list_filter = ("university",)
+    search_fields = ("name", "university__name")
+    autocomplete_fields = ("university",)
+    ordering = ("university", "name")
 
 
 @admin.register(Department)
@@ -43,3 +52,10 @@ class TeacherAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user", "faculty", "department")
     ordering = ("user__last_name", "user__first_name")
     readonly_fields = ("id",)
+
+
+@admin.register(PushSubscription)
+class PushSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("user", "endpoint", "created_at")
+    search_fields = ("user__username", "endpoint")
+    readonly_fields = ("id", "endpoint", "p256dh", "auth", "created_at", "updated_at")

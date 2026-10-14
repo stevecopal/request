@@ -27,7 +27,7 @@ from django.core.validators import validate_email
 from django.db import transaction
 from openpyxl import load_workbook
 
-from accounts.models import Department, Faculty, Student, Teacher
+from accounts.models import Department, Faculty, Student, Teacher, University
 
 REQUIRED_HEADERS = ["MATRICULE", "NOM", "PRENOM", "EMAIL", "FACULTE", "DEPARTEMENT"]
 
@@ -41,6 +41,29 @@ class ImportValidationError(Exception):
         self.message = message
         self.errors = errors or []
         super().__init__(message)
+
+
+def resolve_university(university=None) -> University:
+    """
+    Résout l'université cible de l'import.
+
+    * instance fournie → utilisée telle quelle ;
+    * UUID/fourni → recherchée (404 → erreur) ;
+    * aucun → l'université par défaut (la seule, ou la première par nom).
+    """
+    if isinstance(university, University):
+        return university
+    if university:
+        found = University.objects.filter(pk=university).first()
+        if found is None:
+            raise ImportValidationError("Université introuvable.")
+        return found
+    default = University.objects.order_by("name").first()
+    if default is None:
+        raise ImportValidationError(
+            "Aucune université configurée : créez-en une avant l'import."
+        )
+    return default
 
 
 def _normalize_headers(raw_headers) -> list[str]:
@@ -113,13 +136,19 @@ def _is_valid_email(value: str) -> bool:
 
 
 @transaction.atomic
-def import_users(source, entity: Entity = "students", strict_placement: bool = True) -> int:
+def import_users(
+    source,
+    entity: Entity = "students",
+    strict_placement: bool = True,
+    university=None,
+) -> int:
     """
     Importe des étudiants ou enseignants depuis un flux CSV/XLSX.
 
     :param source: objet fichier (UploadedFile ou similaire).
     :param entity: "students" ou "teachers".
     :param strict_placement: exiger faculté + département (True) ou les tolérer (False).
+    :param university: université cible (instance, UUID ou None = défaut).
     :return: nombre d'enregistrements créés.
     :raises ImportValidationError: en-têtes manquants ou lignes invalides (rollback total).
     """
@@ -129,15 +158,24 @@ def import_users(source, entity: Entity = "students", strict_placement: bool = T
     if entity == "teachers":
         strict_placement = True  # les enseignants exigent un rattachement complet
 
+    target_university = resolve_university(university)
+
     name = getattr(source, "name", "") or ""
     headers, rows = _load_rows(source, name)
     _check_headers(headers)
     if not rows:
         raise ImportValidationError("Le fichier ne contient aucune ligne de données.")
 
-    # Pré-fetch (2 requêtes, pas de N+1) : facultés et couples (faculté, département).
-    faculties = {f.name.strip().upper(): f for f in Faculty.objects.all()}
-    departments = {(d.faculty_id, d.name.strip().upper()): d for d in Department.objects.all()}
+    # Pré-fetch (2 requêtes, pas de N+1) : facultés et couples (faculté, département)
+    # strictement limités à l'université cible (isolation multi-uni).
+    faculties = {
+        (f.university_id, f.name.strip().upper()): f
+        for f in Faculty.objects.filter(university=target_university)
+    }
+    departments = {
+        (d.faculty_id, d.name.strip().upper()): d
+        for d in Department.objects.filter(faculty__university=target_university)
+    }
     existing_matricules = set(
         User.objects.filter(username__in=[r["MATRICULE"] for _, r in rows]).values_list(
             "username", flat=True
@@ -173,13 +211,15 @@ def import_users(source, entity: Entity = "students", strict_placement: bool = T
             if matricule in seen_matricules:
                 line_errors.append(f"MATRICULE en doublon dans le fichier : {matricule}.")
 
-        # Résolution hiérarchique faculté → département.
+        # Résolution hiérarchique faculté → département (dans l'université cible).
         faculty = None
         department = None
         if faculty_name:
-            faculty = faculties.get(faculty_name.upper())
+            faculty = faculties.get((target_university.pk, faculty_name.upper()))
             if faculty is None:
-                line_errors.append(f"FACULTE inexistante : {faculty_name}.")
+                line_errors.append(
+                    f"FACULTE inexistante dans « {target_university.name} » : {faculty_name}."
+                )
         elif strict_placement:
             line_errors.append("FACULTE vide.")
 

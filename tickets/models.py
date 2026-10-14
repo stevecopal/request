@@ -5,6 +5,7 @@ Ticket : cycle de vie SENT → RECEIVED → PROCESSING → {RESOLVED, REJECTED},
 clé UUID, index composites (student,status) / (teacher,status) et contrainte
 garantissant qu'un rejet porte toujours un motif non vide.
 TicketAttachment : pièce jointe rattachée à une règle AttachmentConfig.
+TicketStatusHistory : journal horodaté de chaque changement de statut/décision.
 """
 
 import uuid
@@ -137,3 +138,76 @@ class TicketAttachment(UUIDModel):
 
     def __str__(self):
         return f"{self.config.label} — {self.ticket.short_id}"
+
+
+class TicketStatusHistory(UUIDModel):
+    """
+    Entrée immuable d'historique : chaque création et chaque transition de
+    statut laisse une trace horodatée avec son acteur et son motif éventuel.
+    """
+
+    class ActorRole(models.TextChoices):
+        STUDENT = "student", _("Étudiant")
+        TEACHER = "teacher", _("Enseignant")
+        SYSTEM = "system", _("Système")
+
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name="status_history",
+        verbose_name=_("ticket"),
+    )
+    from_status = models.CharField(
+        _("from status"),
+        max_length=15,
+        choices=Ticket.Status.choices,
+        null=True,
+        blank=True,
+    )
+    to_status = models.CharField(
+        _("to status"), max_length=15, choices=Ticket.Status.choices
+    )
+    actor = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("actor"),
+    )
+    actor_role = models.CharField(
+        _("actor role"),
+        max_length=10,
+        choices=ActorRole.choices,
+        default=ActorRole.SYSTEM,
+    )
+    note = models.TextField(_("note"), blank=True)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("ticket status history")
+        verbose_name_plural = _("ticket status histories")
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(
+                fields=["ticket", "created_at"], name="tsh_ticket_created_idx"
+            ),
+        ]
+
+    @property
+    def from_status_label(self) -> str:
+        return dict(Ticket.Status.choices).get(self.from_status, "—") if self.from_status else "—"
+
+    @property
+    def to_status_label(self) -> str:
+        return dict(Ticket.Status.choices).get(self.to_status, self.to_status)
+
+    @property
+    def actor_label(self) -> str:
+        if self.actor is None:
+            return str(_("Système"))
+        name = self.actor.get_full_name() or self.actor.username
+        return f"{name}"
+
+    def __str__(self):
+        return f"{self.ticket.short_id}: {self.from_status or '—'} → {self.to_status}"

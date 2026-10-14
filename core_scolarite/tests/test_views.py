@@ -5,6 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from accounts.models import Department, Faculty, Student, Teacher
+from accounts.tests.factories import make_university
 from core_scolarite.models import AttachmentConfig, Course, ProblemType
 
 
@@ -17,7 +18,8 @@ def make_student(username, faculty, department):
 
 class FormConfigTests(TestCase):
     def setUp(self):
-        self.faculty = Faculty.objects.create(name="Sciences")
+        self.university = make_university()
+        self.faculty = Faculty.objects.create(university=self.university, name="Sciences")
         self.info = Department.objects.create(faculty=self.faculty, name="Informatique")
         self.math = Department.objects.create(faculty=self.faculty, name="Mathématiques")
         self.student = make_student("ETU001", self.faculty, self.info)
@@ -80,7 +82,8 @@ class FormConfigTests(TestCase):
 
 class AdminImportTests(TestCase):
     def setUp(self):
-        Faculty.objects.create(name="Sciences")
+        self.university = make_university()
+        Faculty.objects.create(university=self.university, name="Sciences")
         self.superuser = User.objects.create_superuser(
             username="ADMIN001", password="x", email="a@b.c"
         )
@@ -97,7 +100,7 @@ class AdminImportTests(TestCase):
         self.client.force_login(self.plain)
         response = self.client.post(
             "/scolarite/admin/import/upload/",
-            {"file": self._upload(), "entity": "students"},
+            {"file": self._upload(), "entity": "students", "university": str(self.university.id)},
         )
         self.assertEqual(response.status_code, 403)
 
@@ -105,7 +108,7 @@ class AdminImportTests(TestCase):
         self.client.force_login(self.superuser)
         response = self.client.post(
             "/scolarite/admin/import/upload/",
-            {"file": self._upload(), "entity": "students"},
+            {"file": self._upload(), "entity": "students", "university": str(self.university.id)},
         )
         # Le département "Informatique" n'existe pas → 400 avec détail par ligne.
         self.assertEqual(response.status_code, 400)
@@ -117,7 +120,7 @@ class AdminImportTests(TestCase):
         self.client.force_login(self.superuser)
         response = self.client.post(
             "/scolarite/admin/import/upload/",
-            {"file": self._upload(), "entity": "students"},
+            {"file": self._upload(), "entity": "students", "university": str(self.university.id)},
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["imported_count"], 1)

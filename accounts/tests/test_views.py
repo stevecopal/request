@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from accounts.models import Department, Faculty, Student
+from accounts.tests.factories import make_university
 
 
 class LoginTests(TestCase):
@@ -46,8 +47,9 @@ class DepartmentCascadeTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="ETU001", password="x")
         Student.objects.create(user=self.user, registration_number="ETU001")
-        self.faculty = Faculty.objects.create(name="Sciences")
-        self.other = Faculty.objects.create(name="Lettres")
+        university = make_university()
+        self.faculty = Faculty.objects.create(university=university, name="Sciences")
+        self.other = Faculty.objects.create(university=university, name="Lettres")
         Department.objects.create(faculty=self.faculty, name="Informatique")
         Department.objects.create(faculty=self.other, name="Histoire")
 
@@ -69,7 +71,8 @@ class OnboardingTests(TestCase):
         self.student = Student.objects.create(
             user=self.user, registration_number="ETU001"
         )
-        self.faculty = Faculty.objects.create(name="Sciences")
+        self.university = make_university()
+        self.faculty = Faculty.objects.create(university=self.university, name="Sciences")
         self.department = Department.objects.create(
             faculty=self.faculty, name="Informatique"
         )
@@ -85,7 +88,7 @@ class OnboardingTests(TestCase):
         self.assertTrue(self.student.is_onboarded)
 
     def test_department_must_belong_to_faculty(self):
-        other = Faculty.objects.create(name="Lettres")
+        other = Faculty.objects.create(university=self.university, name="Lettres")
         response = self.client.post(
             "/accounts/ajax/onboarding/",
             {"faculty": str(other.id), "department": str(self.department.id)},

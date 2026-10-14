@@ -5,13 +5,14 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from accounts.models import Department, Faculty, Student, Teacher
+from accounts.tests.factories import make_university
 from core_scolarite.models import Course, ProblemType
 from tickets.models import Ticket
 
 
 class TicketModelTests(TestCase):
     def setUp(self):
-        faculty = Faculty.objects.create(name="Sciences")
+        faculty = Faculty.objects.create(university=make_university(), name="Sciences")
         dept = Department.objects.create(faculty=faculty, name="Informatique")
         self.student = Student.objects.create(
             user=User.objects.create_user(username="ETU001", password="x"),
