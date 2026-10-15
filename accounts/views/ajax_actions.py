@@ -11,6 +11,7 @@ import json
 
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
+from django.contrib.auth import authenticate
 from django.http import JsonResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -18,7 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.decorators import login_required_json, student_required
-from accounts.forms import LoginForm, OnboardingForm
+from accounts.forms import OnboardingForm
 from accounts.models import Department
 from accounts.services import webpush
 
@@ -69,39 +70,61 @@ def _register_failure(request):
 
 @require_POST
 def login_view(request):
-    """Authentification par matricule + mot de passe → JSON."""
+    """Authentification par matricule + mot de passe → JSON.
+
+    Phase 4 : login/logout, cascade Faculté → Département, onboarding MVP.
+    Règle IDOR : ces vues ne lisent jamais d'identifiant de profil côté client ;
+    ongagement (ID) client est toujours ignoré côté serveur.
+
+    La résolution du payload est explicite (§9.2) : on accepte deux variantes de
+    champ HTML (`matricule` / `username`) afin de capter toutes les
+    intégrations front, puis on transmet le login résolu directement sous le nom
+    `username` à `authenticate()` : la `User.username` stocke bien le
+    matricule généré par `seed_demo`.
+    """
     if request.user.is_authenticated:
         return JsonResponse({"status": "success", "next": reverse("accounts:dashboard")})
 
     if _is_locked(request):
+        return _error(_("Trop de tentatives. Réessayez dans quelques minutes."), status=429)
+
+    # 1. Résolution du payload
+    matricule = request.POST.get("matricule")
+    if not matricule:
+        matricule = request.POST.get("username")
+    password = request.POST.get("password")
+
+    # 2. Validation des champs obligatoires
+    if not matricule or not password:
+        attempts = _register_failure(request)
         return _error(
-            _("Trop de tentatives. Réessayez dans quelques minutes."), status=429
+            _("Matricule et mot de passe sont requis. Saisissez vos deux identifiants."),
+            status=400,
+            attempts=attempts,
         )
 
-    form = LoginForm(request=request, data=request.POST)
-    if not form.is_valid():
-        attempts = _register_failure(request)
-        # Message explicite : « Identifiants invalides. » si échec d'authentification,
-        # sinon (champ vide) consigne de saisie — jamais de « Données invalides. ».
-        message = form.errors.get("__all__", [None])[0]
-        if message is None:
-            message = _(
-                "Matricule et mot de passe sont requis. Saisissez vos deux identifiants."
-            )
-        return _error(message, status=400, attempts=attempts)
+    # 3. Authentification stricte : username=matricule (donnée brute, tel quel)
+    user = authenticate(request, username=matricule, password=password)
 
-    user = form.user
+    if user is None:
+        _register_failure(request)
+        return _error(_("Matricule ou mot de passe incorrect."), status=401)
+
+    if not user.is_active:
+        _register_failure(request)
+        return _error(_("Ce compte est désactivé."), status=401)
+
+    # 4. Connexion et session
     auth_login(request, user)
-    # Réinitialise le compteur après une connexion réussie.
     request.session.pop("login_attempts", None)
     request.session.pop("login_lock_until", None)
 
+    # 5. Rôle + payload
     role = _role_name(user)
     return JsonResponse(
         {
             "status": "success",
-            "message": str(_("Connexion réussie.")),
-            "role": role,
+            "user_type": role,
             "next": reverse("accounts:dashboard"),
         }
     )

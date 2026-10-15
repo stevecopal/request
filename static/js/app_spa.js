@@ -142,8 +142,45 @@
    * @param {string} url - route Django servant le fragment
    * @param {{title?: string}} opts
    */
+  /* Endpoints JSON reserves au POST : jamais charges en GET dans la modale.
+     Garde-fou anti-405 : un data-modal-src mal configure bascule vers
+     le fragment HTML /login/ au lieu de requeter /accounts/login/ en GET. */
+  var JSON_ONLY_PATHS = [
+    "/accounts/login/",
+    "/accounts/logout/",
+    "/accounts/ajax/onboarding/",
+    "/accounts/ajax/push/subscribe/",
+    "/accounts/ajax/push/unsubscribe/",
+    "/accounts/ajax/notifications/read/"
+  ];
+
+  function isJsonOnlyPath(url) {
+    if (!url) return false;
+    var path = String(url).split("?")[0].split("#")[0];
+    // N'operer que sur les chemins same-origin (ignore http(s):// externes).
+    if (/^https?:\/\//i.test(path)) {
+      try {
+        var parsed = new URL(path, window.location.origin);
+        if (parsed.origin !== window.location.origin) return false;
+        path = parsed.pathname;
+      } catch (e) {
+        return false;
+      }
+    }
+    if (path.charAt(0) !== "/") return false;
+    for (var i = 0; i < JSON_ONLY_PATHS.length; i++) {
+      if (path === JSON_ONLY_PATHS[i]) return true;
+    }
+    return false;
+  }
+
   function loadIntoModal(url, opts) {
     opts = opts || {};
+    if (isJsonOnlyPath(url)) {
+      // Redirige vers le fragment HTML plutot que de declencher un 405.
+      url = "/login/";
+      if (!opts.title || opts.title === "…") opts.title = "Connexion";
+    }
     openMasterModal(opts.title || "…");
     showModalSkeleton(opts.title);
 

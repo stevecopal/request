@@ -18,13 +18,13 @@ class LoginTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "success")
-        self.assertEqual(response.json()["role"], "student")
+        self.assertEqual(response.json()["user_type"], "student")
 
     def test_login_invalid_credentials(self):
         response = self.client.post(
             "/accounts/login/", {"matricule": "ETU001", "password": "wrong"}
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["status"], "error")
 
     def test_login_rate_limited_after_five_attempts(self):

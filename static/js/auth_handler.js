@@ -1,254 +1,259 @@
-/**
- * auth_handler.js — connexion, déconnexion et onboarding (UnivReq).
- *
- * Sécurité (OWASP) :
- *   - le formulaire déclare `method="post"` ; ce contrôleur intercepte le
- *     `submit` via `event.preventDefault()` : rien ne part jamais en query
- *     string, l'URL reste propre (aucun mot de passe / matricule visible) ;
- *   - envoi `fetch()` POST avec en-tête `X-CSRFToken` lu dans le cookie ;
- *   - corps compilé via `FormData` (aucune sérialisation manuelle).
- *
- * UX : état de chargement (champs désactivés + pulsation du bouton), erreurs
- * rendues dans la modale (400/401) sans rompre la session, succès → toaster.
- */
-(function () {
-  "use strict";
-
-  var api = window.UnivReq;
-
-  /* ------------------------------------------------------------------ */
-  /* Utilitaire : lecture sécurisée du cookie CSRF                      */
-  /* ------------------------------------------------------------------ */
+document.addEventListener('DOMContentLoaded', function () {
+  var api = window.UnivReq || {};
+  var LOGIN_URL = '/accounts/login/';
 
   function getCookie(name) {
-    var match = document.cookie.match(
-      new RegExp("(?:^|;\\s*)" + name.replace(/([.*+?^${}()|[\]\\])/g, "\\$1") + "=([^;]*)")
-    );
-    return match ? decodeURIComponent(match[1]) : null;
+    var value = '; ' + document.cookie;
+    var parts = value.split('; ' + name + '=');
+    if (parts.length !== 2) return null;
+    return parts.pop().split(';').shift();
   }
 
-  var SPINNER =
-    '<span class="inline-block w-5 h-5 mr-2 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true"></span>';
+  function csrfFromForm(form) {
+    var input = form.querySelector('[name=csrfmiddlewaretoken]');
+    if (input && input.value) return input.value;
+    return getCookie('csrftoken') || '';
+  }
 
-  function setFormBusy(form, busy) {
-    var fields = form.querySelectorAll("input, select, textarea, button");
-    fields.forEach(function (field) {
-      field.disabled = busy;
-    });
-    form.setAttribute("aria-busy", busy ? "true" : "false");
-
-    var submit = form.querySelector('[type="submit"]');
+  function setBusy(form, busy) {
+    // Ne jamais desactiver les inputs : un champ disabled est exclu de
+    // FormData et le POST arriverait vide (400). On verrouille le submit.
+    var submit = form.querySelector('[type=submit]');
+    if (submit) submit.disabled = busy;
+    form.setAttribute('aria-busy', busy ? 'true' : 'false');
     if (!submit) return;
     if (busy) {
-      if (!submit.dataset.originalHtml) submit.dataset.originalHtml = submit.innerHTML;
-      submit.innerHTML = SPINNER + submit.dataset.originalHtml;
-      submit.classList.add("opacity-80", "pointer-events-none");
-    } else if (submit.dataset.originalHtml) {
-      submit.innerHTML = submit.dataset.originalHtml;
-      submit.classList.remove("opacity-80", "pointer-events-none");
+      if (!submit.dataset.label) submit.dataset.label = submit.innerHTML;
+      submit.innerHTML = 'Connexion...';
+      submit.classList.add('opacity-80');
+    } else if (submit.dataset.label) {
+      submit.innerHTML = submit.dataset.label;
+      submit.classList.remove('opacity-80');
     }
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Connexion                                                           */
-  /* ------------------------------------------------------------------ */
+  function notify(msg, kind) {
+    if (typeof api.showNotification === 'function') api.showNotification(msg, kind);
+  }
 
-  function handleLogin(form) {
-    var errorBox = form.querySelector("#login-error");
+  function closeModal() {
+    if (typeof api.closeModal === 'function') api.closeModal();
+  }
 
-    function fail(message) {
-      // 400/401 : la modale reste ouverte, la session n'est pas touchée.
-      if (errorBox) {
-        errorBox.textContent = message;
-        errorBox.classList.remove("hidden");
-      }
-      api.showNotification(message, "error");
+  function loginErrorMessage(status, data) {
+    if (data && data.message) return data.message;
+    if (status === 400) return 'Matricule et mot de passe sont requis.';
+    if (status === 401) return 'Matricule ou mot de passe incorrect.';
+    if (status === 403) return 'Session expiree ou jeton CSRF invalide. Rechargez la page et reessayez.';
+    if (status === 405) return 'Methode non autorisee : rechargez le formulaire via /login/ puis reessayez.';
+    if (status === 429) return 'Trop de tentatives. Reessayez dans quelques minutes.';
+    if (status) return 'Erreur de connexion (' + status + ').';
+    return 'Erreur de connexion.';
+  }
+
+  async function parseBodySafe(response) {
+    // Les erreurs Django non-JSON (405/403 HTML de @require_POST ou du
+    // middleware CSRF) ne doivent jamais faire planter sur response.json().
+    var text = '';
+    try {
+      text = await response.text();
+    } catch (e) {
+      return {};
     }
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return {};
+    }
+  }
 
-    form.addEventListener("submit", function (event) {
-      event.preventDefault(); // interdit toute soumission GET native
-      if (errorBox) errorBox.classList.add("hidden");
-      setFormBusy(form, true);
-
-      api
-        .apiFetch(form.getAttribute("data-login-url"), {
-          method: "POST",
-          headers: { "X-CSRFToken": getCookie("csrftoken") || "" },
-          body: new FormData(form),
-        })
-        .then(function (result) {
-          var data = result.data || {};
-          api.closeModal();
-          api.showNotification(data.message || "Connexion réussie", "success");
-
-          var next = data.next || "/dashboard/";
-          if (document.getElementById("spa-config")) {
-            // Déjà dans la coque SPA : injection du fragment, zéro rechargement.
+  function bindLogin(loginForm) {
+    loginForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var errorBox = loginForm.querySelector('#login-error');
+      var passwordInput = loginForm.querySelector('input[name=password]');
+      var matriculeInput = loginForm.querySelector('input[name=matricule]');
+      if (errorBox) errorBox.classList.add('hidden');
+      // Validation locale : ne jamais envoyer un POST vide (400 + compteur
+      // rate-limit inutilement incremente). Le backend revalide de toute facon.
+      var matriculeVal = matriculeInput ? matriculeInput.value.trim() : '';
+      var passwordVal = passwordInput ? passwordInput.value : '';
+      if (!matriculeVal || !passwordVal) {
+        if (errorBox) {
+          errorBox.textContent = 'Saisissez votre matricule et votre mot de passe.';
+          errorBox.classList.remove('hidden');
+        }
+        if (!matriculeVal && matriculeInput) matriculeInput.focus();
+        else if (passwordInput) passwordInput.focus();
+        return;
+      }
+      // Capturer les donnees AVANT de verrouiller le formulaire.
+      var formData = new FormData(loginForm);
+      setBusy(loginForm, true);
+      try {
+        var url = loginForm.getAttribute('data-login-url') || loginForm.getAttribute('action') || LOGIN_URL;
+        var response = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfFromForm(loginForm) },
+          body: formData,
+          credentials: 'same-origin'
+        });
+        var data = await parseBodySafe(response);
+        if (response.ok) {
+          closeModal();
+          notify('Connexion reussie', 'success');
+          var next = data.next || '/dashboard/';
+          var viewport = document.getElementById('spa-viewport');
+          if (viewport && typeof api.loadFragment === 'function') {
             api.loadFragment(next, { pushState: false });
           } else {
-            // Depuis la landing : navigation vers la coque (header + bottom-nav).
             window.location.href = next;
           }
-        })
-        .catch(function (err) {
-          var payload = err.data || {};
-          var message = payload.message;
-          if (!message) {
-            // Réponse non-JSON (proxy, coupure réseau…) : message explicite
-            // selon le statut, jamais de « Erreur 400 » brute.
-            if (err.status === 400 || err.status === 401) {
-              message = "Matricule ou mot de passe incorrect. Vérifiez vos informations.";
-            } else if (err.status === 429) {
-              message = "Trop de tentatives de connexion. Réessayez dans quelques minutes.";
-            } else {
-              message = "Connexion impossible pour le moment. Réessayez dans un instant.";
-            }
+        } else {
+          if (passwordInput) passwordInput.value = '';
+          if (errorBox) {
+            errorBox.textContent = loginErrorMessage(response.status, data);
+            errorBox.classList.remove('hidden');
           }
-          fail(message);
-          setFormBusy(form, false); // la modale reste active pour réessayer
-        });
+          notify(loginErrorMessage(response.status, data), 'error');
+        }
+      } catch (err) {
+        if (errorBox) {
+          errorBox.textContent = 'Connexion impossible. Reessayez dans un instant.';
+          errorBox.classList.remove('hidden');
+        }
+        notify('Connexion impossible.', 'error');
+      } finally {
+        setBusy(loginForm, false);
+      }
     });
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Déconnexion                                                         */
-  /* ------------------------------------------------------------------ */
-
-  function handleLogout(button) {
-    setBusy(button, true);
-    api
-      .apiFetch(button.getAttribute("data-logout-url"), {
-        method: "POST",
-        headers: { "X-CSRFToken": getCookie("csrftoken") || "" },
-      })
-      .then(function (result) {
-        window.location.href = (result.data && result.data.next) || "/";
-      })
-      .catch(function (err) {
-        setBusy(button, false);
-        api.showNotification(err.message || "Déconnexion impossible.", "error");
+  function bindLogout(button) {
+    var url = button.getAttribute('data-logout-url') || '/accounts/logout/';
+    fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') || '' },
+      credentials: 'same-origin'
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        return { status: response.status, data: data };
       });
+    }).then(function (result) {
+      var next = (result.data && result.data.next) ? result.data.next : '/';
+      window.location.href = next;
+    }).catch(function () {
+      notify('Deconnexion impossible.', 'error');
+    });
   }
-
-  function setBusy(button, busy) {
-    if (!button) return;
-    button.disabled = busy;
-    button.setAttribute("aria-busy", busy ? "true" : "false");
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Onboarding — cascade Faculté → Département                          */
-  /* ------------------------------------------------------------------ */
 
   function escapeHtml(value) {
-    var div = document.createElement("div");
-    div.textContent = value == null ? "" : value;
+    var div = document.createElement('div');
+    div.textContent = value == null ? '' : value;
     return div.innerHTML;
   }
 
   function loadDepartments(facultySelect) {
-    var targetSelector = facultySelect.getAttribute("data-department-target");
-    var url = facultySelect.getAttribute("data-departments-url");
-    var target = document.querySelector(targetSelector);
-    if (!target) return;
-
+    var targetSelector = facultySelect.getAttribute('data-department-target');
+    var url = facultySelect.getAttribute('data-departments-url');
+    var target = targetSelector ? document.querySelector(targetSelector) : null;
+    if (!target || !url) return;
     var facultyId = facultySelect.value;
     target.disabled = true;
-    target.innerHTML = '<option value="">Chargement…</option>';
-
+    target.innerHTML = '<option value=\"\">Chargement...</option>';
     if (!facultyId) {
-      target.innerHTML = '<option value="">Sélectionnez d\'abord une faculté</option>';
+      target.innerHTML = '<option value=\"\">Selectionnez une faculte</option>';
       return;
     }
-
-    api
-      .apiFetch(url + "?faculty=" + encodeURIComponent(facultyId))
-      .then(function (result) {
-        var options = ['<option value="">Sélectionnez un département</option>'];
-        (result.data.departments || []).forEach(function (dept) {
-          options.push('<option value="' + dept.id + '">' + escapeHtml(dept.name) + "</option>");
-        });
-        target.innerHTML = options.join("");
-        target.disabled = false;
-      })
-      .catch(function (err) {
-        target.innerHTML = '<option value="">Erreur de chargement</option>';
-        api.showNotification(err.message || "Chargement impossible.", "error");
+    var fetcher = (typeof api.apiFetch === 'function')
+      ? api.apiFetch(url + '?faculty=' + encodeURIComponent(facultyId))
+      : fetch(url + '?faculty=' + encodeURIComponent(facultyId), { credentials: 'same-origin' }).then(function (r) { return r.json().then(function (d) { return { data: d }; }); });
+    fetcher.then(function (result) {
+      var list = (result.data && result.data.departments) ? result.data.departments : [];
+      var options = ['<option value=\"\">Selectionnez un departement</option>'];
+      list.forEach(function (dept) {
+        options.push('<option value=\"' + dept.id + '\">' + escapeHtml(dept.name) + '</option>');
       });
-  }
-
-  function handleOnboarding(form) {
-    var errorBox = form.querySelector("#onboarding-error");
-    var facultySelect = form.querySelector("[data-department-target]");
-
-    if (facultySelect) {
-      facultySelect.addEventListener("change", function () {
-        loadDepartments(facultySelect);
-      });
-    }
-
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      if (errorBox) errorBox.classList.add("hidden");
-      setFormBusy(form, true);
-
-      api
-        .apiFetch(form.getAttribute("data-onboarding-url"), {
-          method: "POST",
-          headers: { "X-CSRFToken": getCookie("csrftoken") || "" },
-          body: new FormData(form),
-        })
-        .then(function (result) {
-          var data = result.data || {};
-          api.closeModal();
-          api.showNotification(data.message || "Profil enregistré.", "success");
-          window.location.href = data.next || "/dashboard/";
-        })
-        .catch(function (err) {
-          var payload = err.data || {};
-          var message = payload.message || err.message || "Enregistrement impossible.";
-          if (errorBox) {
-            errorBox.textContent = message;
-            errorBox.classList.remove("hidden");
-          }
-          api.showNotification(message, "error");
-          setFormBusy(form, false);
-        });
+      target.innerHTML = options.join('');
+      target.disabled = false;
+    }).catch(function () {
+      target.innerHTML = '<option value=\"\">Erreur de chargement</option>';
     });
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Câblage (formulaires injectés en modale compris)                   */
-  /* ------------------------------------------------------------------ */
+  function bindOnboarding(form) {
+    var errorBox = form.querySelector('#onboarding-error');
+    var facultySelect = form.querySelector('[data-department-target]');
+    if (facultySelect) {
+      facultySelect.addEventListener('change', function () { loadDepartments(facultySelect); });
+    }
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (errorBox) errorBox.classList.add('hidden');
+      // Capturer les donnees AVANT de verrouiller le formulaire.
+      var formData = new FormData(form);
+      setBusy(form, true);
+      try {
+        var url = form.getAttribute('data-onboarding-url') || form.getAttribute('action') || '/accounts/ajax/onboarding/';
+        var response = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfFromForm(form) },
+          body: formData,
+          credentials: 'same-origin'
+        });
+        var data = await parseBodySafe(response);
+        if (response.ok) {
+          closeModal();
+          notify(data.message || 'Profil enregistre.', 'success');
+          window.location.href = data.next || '/dashboard/';
+        } else {
+          if (errorBox) {
+            errorBox.textContent = data.message || 'Erreur de sauvegarde.';
+            errorBox.classList.remove('hidden');
+          }
+          notify(data.message || 'Erreur de sauvegarde.', 'error');
+        }
+      } catch (err) {
+        if (errorBox) {
+          errorBox.textContent = 'Connexion impossible. Reessayez dans un instant.';
+          errorBox.classList.remove('hidden');
+        }
+        notify('Enregistrement impossible.', 'error');
+      } finally {
+        setBusy(form, false);
+      }
+    });
+  }
 
   function wire(root) {
-    var loginForm = root.querySelector("#login-form");
+    if (!root || !root.querySelector) return;
+    var loginForm = root.querySelector('#login-form');
     if (loginForm && !loginForm.dataset.wired) {
-      loginForm.dataset.wired = "1";
-      handleLogin(loginForm);
+      loginForm.dataset.wired = '1';
+      bindLogin(loginForm);
     }
-    var onboardingForm = root.querySelector("#onboarding-form");
+    var onboardingForm = root.querySelector('#onboarding-form');
     if (onboardingForm && !onboardingForm.dataset.wired) {
-      onboardingForm.dataset.wired = "1";
-      handleOnboarding(onboardingForm);
+      onboardingForm.dataset.wired = '1';
+      bindOnboarding(onboardingForm);
     }
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    wire(document);
-  });
+  wire(document);
 
-  document.addEventListener("click", function (event) {
-    var logoutButton = event.target.closest("[data-logout]");
-    if (logoutButton) {
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest ? event.target.closest('[data-logout]') : null;
+    if (btn) {
       event.preventDefault();
-      handleLogout(logoutButton);
+      bindLogout(btn);
     }
   });
 
-  // Exposé pour les autres modules / tests.
   api.getCookie = getCookie;
+  var previousHook = api.onModalContentLoaded;
   api.onModalContentLoaded = function (body) {
+    if (typeof previousHook === 'function') previousHook(body);
     wire(body);
   };
-})();
+});

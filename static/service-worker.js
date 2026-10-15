@@ -8,7 +8,7 @@
  *               (repli cache) pour les endpoints de données du dashboard ;
  *               jamais de cache pour les POST ni les WebSockets.
  */
-const VERSION = "univreq-v2";
+const VERSION = "univreq-v3";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
