@@ -6,13 +6,9 @@
     <section class="dashboard-hero">
         <div class="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 flex-1 items-center gap-4">
-                <span class="avatar avatar--xl" aria-hidden="true">
-                    {% if request.user.first_name or request.user.last_name %}{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}{% else %}{{ request.user.username|slice:":2"|upper }}{% endif %}
-                </span>
+                
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-wider text-navy-500">
-                        {% trans "Pilotage" %}
-                    </p>
+                
                     <h1 class="mt-1 truncate text-2xl font-extrabold text-navy-dark sm:text-3xl">
                         {{ request.user.get_full_name|default:request.user.username }}
                     </h1>

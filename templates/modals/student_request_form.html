@@ -1,7 +1,9 @@
 {% load i18n %}
-{# Formulaire dynamique de nouvelle requête — les champs UE/enseignant/pièces
-   jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
-   Étape 1 : saisie. Étape 2 : prévisualisation (aucun envoi avant confirmation). #}
+{% comment %}
+Formulaire dynamique de nouvelle requête — les champs UE/enseignant/pièces
+jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
+Étape 1 : saisie. Étape 2 : prévisualisation (aucun envoi avant confirmation).
+{% endcomment %}
 <form id="ticket-form" class="space-y-4" novalidate
       method="post"
       action="{% url 'tickets:create_ticket' %}"
@@ -49,7 +51,7 @@
             <label class="label" for="ticket-description">
                 {% trans "Commentaires" %} <span class="text-red-600" aria-hidden="true">*</span>
             </label>
-            <textarea class="field min-h-24" id="ticket-description" name="description"
+            <textarea class="field min-h-24 resize-none" id="ticket-description" name="description"
                       rows="4" required
                       placeholder="{% trans 'Décrivez précisément votre situation…' %}"></textarea>
         </div>

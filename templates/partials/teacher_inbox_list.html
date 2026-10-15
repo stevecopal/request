@@ -1,6 +1,8 @@
 {% load i18n %}
-{# Liste des requêtes de la boîte enseignant — fragment rafraîchissable
-   en temps réel (cible #teacher-inbox-list) sans perdre filtres/détail. #}
+{% comment %}
+Liste des requêtes de la boîte enseignant — fragment rafraîchissable
+en temps réel (cible #teacher-inbox-list) sans perdre filtres/détail.
+{% endcomment %}
 {% if tickets %}
     <p class="text-sm text-slate-500" data-inbox-count>
         {{ total_count }} {% if total_count > 1 %}{% trans "requêtes" %}{% else %}{% trans "requête" %}{% endif %}

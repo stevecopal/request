@@ -157,11 +157,11 @@
     @apply w-auto;
   }
 
-  /* --- Champs de saisie : focus bleu accent + anneau navy ------------ */
+  /* --- Champs de saisie : focus discret (bordure + halo léger) ------- */
   .field {
     @apply w-full min-h-12 px-4 rounded-xl border border-slate-200 bg-white
            text-navy-dark placeholder:text-slate-400 transition-colors
-           focus:outline-none focus:border-navy-light focus:ring-2 focus:ring-navy/30;
+           focus:outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy/15;
   }
   .field-error {
     @apply border-red-600 ring-2 ring-red-600/30;

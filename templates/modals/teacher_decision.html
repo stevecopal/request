@@ -1,6 +1,8 @@
 {% load i18n %}
-{# Modale de décision enseignant — Valider (RESOLVED), Rejeter (REJECTED + motif),
-   Demander des infos (MORE_INFO + question obligatoire) #}
+{% comment %}
+Modale de décision enseignant — Valider (RESOLVED), Rejeter (REJECTED + motif),
+Demander des infos (MORE_INFO + question obligatoire)
+{% endcomment %}
 <form id="teacher-decision-form" class="space-y-4" novalidate
       method="post"
       action="{% url 'tickets:update_status' %}"

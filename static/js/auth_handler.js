@@ -103,13 +103,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (response.ok) {
           closeModal();
           notify('Connexion reussie', 'success');
-          var next = data.next || '/dashboard/';
-          var viewport = document.getElementById('spa-viewport');
-          if (viewport && typeof api.loadFragment === 'function') {
-            api.loadFragment(next, { pushState: false });
-          } else {
-            window.location.href = next;
-          }
+          // Navigation complète : la connexion bascule de l'espace public vers
+          // la coque applicative. Un swap de fragment injecterait la coque
+          // entière (avec son propre #spa-viewport) dans la page publique, qui
+          // ne rejouerait pas son initialisation (squelette figé).
+          window.location.href = data.next || '/dashboard/';
         } else {
           if (passwordInput) passwordInput.value = '';
           if (errorBox) {

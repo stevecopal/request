@@ -1,7 +1,9 @@
 {% load i18n %}
-{# Détail d'un ticket (enseignant assigné ou étudiant propriétaire) — injecté
-   sans rechargement. Les actions de décision ne sont rendues qu'à l'enseignant
-   assigné (can_decide) ; l'étudiant ne voit que le suivi.                   #}
+{% comment %}
+Détail d'un ticket (enseignant assigné ou étudiant propriétaire) — injecté
+sans rechargement. Les actions de décision ne sont rendues qu'à l'enseignant
+assigné (can_decide) ; l'étudiant ne voit que le suivi.
+{% endcomment %}
 <article class="rise card p-6 space-y-5"
          data-ticket-id="{{ ticket.id }}"
          data-status="{{ ticket.status }}"
