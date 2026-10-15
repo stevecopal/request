@@ -17,7 +17,9 @@ from accounts.models import Faculty
 from accounts.utils import (
     ROLE_STUDENT,
     nav_items,
+    nav_sections,
     role_dashboard_url,
+    role_label,
     role_name,
 )
 
@@ -68,7 +70,14 @@ def dashboard_shell(request):
         ).count()
     context = {
         "role": role,
+        "role_label": role_label(role),
+        "display_name": request.user.get_full_name() or request.user.username,
+        "initials": (request.user.first_name[:1] + request.user.last_name[:1]).upper()
+        or request.user.username[:2].upper(),
         "nav_items": nav_items(role, unread_notifications=unread_notifications),
+        "nav_sections": nav_sections(
+            role, unread_notifications=unread_notifications
+        ),
         "unread_notifications": unread_notifications,
         "initial_fragment": reverse(role_dashboard_url(role)),
         "needs_onboarding": needs_onboarding,

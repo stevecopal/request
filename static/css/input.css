@@ -71,6 +71,12 @@
     padding-right: 0.5cm;
   }
 
+  /* Coque authentifiée : la barre latérale occupe toute la largeur. */
+  html.app-shell {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
   body {
     @apply bg-background text-navy-dark font-sans antialiased;
     overscroll-behavior-y: contain;
@@ -90,6 +96,13 @@
   textarea:focus-visible,
   [tabindex]:focus-visible {
     @apply outline-none ring-2 ring-navy ring-offset-2 ring-offset-background;
+  }
+
+  /* Le viewport SPA reçoit le focus programme (accessibilité) mais ne doit
+     jamais afficher d'anneau : ce n'est pas un contrôle interactif. */
+  #spa-viewport:focus,
+  #spa-viewport:focus-visible {
+    @apply outline-none ring-0 ring-offset-0;
   }
 
   .skip-link {
@@ -310,5 +323,177 @@
     content: "";
     @apply absolute -bottom-32 -left-24 w-80 h-80 rounded-full
            bg-navy-600/10 blur-3xl pointer-events-none;
+  }
+
+  /* ================================================================== *
+   * COQUE APPLICATIVE AUTHENTIFIÉE (sidebar + topbar + footer)
+   * ================================================================== */
+
+  /* --- Barre latérale ---------------------------------------------- */
+  .app-sidebar {
+    @apply flex-col overflow-hidden border-r border-slate-200 bg-white lg:shrink-0;
+  }
+  .app-sidebar__brand {
+    @apply flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-4;
+  }
+  .app-sidebar__nav {
+    @apply flex-1 space-y-5 overflow-y-auto px-3 py-4;
+  }
+  .app-sidebar__user {
+    @apply border-t border-slate-100 p-4;
+  }
+  .app-nav__section {
+    @apply mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400;
+  }
+  .app-nav__item {
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-slate-500
+           transition-colors duration-150 hover:bg-slate-50 hover:text-navy-dark
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy
+           focus-visible:ring-offset-1;
+  }
+  .app-nav__item[aria-current="page"] {
+    @apply bg-navy-50 text-navy-dark;
+  }
+  .app-nav__icon {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-lg
+           bg-slate-100 text-slate-500 transition-colors;
+  }
+  .app-nav__item:hover .app-nav__icon {
+    @apply bg-slate-200 text-navy-dark;
+  }
+  .app-nav__item[aria-current="page"] .app-nav__icon {
+    @apply bg-navy text-white shadow-brand;
+  }
+  .app-nav__desc {
+    @apply mt-0.5 block truncate text-[11px] font-normal text-slate-400;
+  }
+  .app-nav__item[aria-current="page"] .app-nav__desc {
+    @apply text-navy-500;
+  }
+  .app-nav__badge {
+    @apply ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full
+           bg-red-600 px-1.5 text-[11px] font-bold text-white;
+  }
+
+  /* --- En-tête ------------------------------------------------------ */
+  .app-topbar {
+    @apply sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200
+           bg-white/95 px-4 backdrop-blur sm:px-6;
+  }
+
+  /* --- Contenu ------------------------------------------------------ */
+  .app-content {
+    @apply mx-auto w-full max-w-shell flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8;
+  }
+
+  /* --- Petit pied de page ------------------------------------------ */
+  .app-footer {
+    @apply mt-auto flex flex-col items-center justify-between gap-1 border-t
+           border-slate-200 px-4 py-4 text-xs text-slate-400 sm:flex-row sm:px-6 lg:px-8;
+  }
+  .app-footer__meta {
+    @apply text-slate-300;
+  }
+
+  /* --- Avatar ------------------------------------------------------- */
+  .avatar {
+    @apply flex h-10 w-10 items-center justify-center rounded-full
+           bg-gradient-to-br from-navy-700 to-navy text-sm font-bold text-white;
+  }
+  .avatar--sm {
+    @apply h-8 w-8 text-xs;
+  }
+  .avatar--xl {
+    @apply h-16 w-16 shrink-0 text-xl font-extrabold sm:h-20 sm:w-20 sm:text-2xl;
+  }
+  .avatar--glass {
+    @apply bg-none bg-white/15 text-white ring-1 ring-white/30;
+  }
+
+  /* --- Menu utilisateur (<details>) -------------------------------- */
+  .app-usermenu {
+    @apply relative;
+  }
+  .app-usermenu > summary {
+    @apply list-none;
+  }
+  .app-usermenu > summary::-webkit-details-marker {
+    display: none;
+  }
+  .app-usermenu[open] > summary {
+    @apply bg-slate-100;
+  }
+  .app-usermenu__panel {
+    @apply absolute right-0 z-40 mt-2 w-60 overflow-hidden rounded-2xl border
+           border-slate-100 bg-white shadow-card-hover;
+  }
+  .app-usermenu__link {
+    @apply flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm
+           font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-navy-dark;
+  }
+  .app-usermenu__link--danger {
+    @apply text-red-600 hover:bg-red-50 hover:text-red-700;
+  }
+
+  /* --- Tableaux de bord : bannière, cartes, raccourcis, panneaux --- */
+  /* Bannière claire : le blanc domine, dégradé léger vers un bleu très pâle. */
+  .dashboard-hero {
+    @apply relative overflow-hidden rounded-2xl border border-navy-100
+           bg-gradient-to-br from-white via-white to-navy-50 p-5 shadow-card sm:p-7;
+  }
+  .dashboard-hero::before {
+    content: "";
+    @apply pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full
+           bg-navy-100/60 blur-3xl;
+  }
+  .dashboard-hero::after {
+    content: "";
+    @apply pointer-events-none absolute -bottom-24 right-20 h-44 w-44 rounded-full
+           bg-navy-50 blur-2xl;
+  }
+
+  .stat-card {
+    @apply relative flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white
+           p-4 shadow-card transition-all duration-200 hover:-translate-y-0.5
+           hover:shadow-card-hover;
+  }
+  .stat-card__icon {
+    @apply flex h-11 w-11 items-center justify-center rounded-xl;
+  }
+  .stat-card__value {
+    @apply text-2xl font-extrabold tabular-nums text-navy-dark sm:text-3xl;
+  }
+  .stat-card__label {
+    @apply text-xs font-medium text-slate-500;
+  }
+
+  .quick-action {
+    @apply flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4
+           text-left shadow-card transition-all duration-200 hover:-translate-y-0.5
+           hover:border-navy-100 hover:shadow-card-hover;
+  }
+  .quick-action__icon {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+           bg-navy-50 text-navy;
+  }
+
+  .panel {
+    @apply overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card;
+  }
+  .panel__header {
+    @apply flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4;
+  }
+  .panel__title {
+    @apply text-sm font-bold text-navy-dark;
+  }
+  .panel__body {
+    @apply p-5;
+  }
+
+  .meter {
+    @apply h-2 w-full overflow-hidden rounded-full bg-slate-100;
+  }
+  .meter__fill {
+    @apply h-full rounded-full bg-navy transition-all duration-500;
   }
 }

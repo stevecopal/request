@@ -259,25 +259,7 @@
             </div>
         </section>
 
-        {# ==================== C — APPEL À L'ACTION FINAL ==================== #}
-        <section id="acces" class="landing-bleed scroll-mt-20 bg-navy">
-            <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 lg:py-20 text-center">
-                <h2 class="mx-auto max-w-2xl text-2xl font-extrabold tracking-tight text-white
-                           break-words sm:text-3xl lg:text-4xl">
-                    {% trans "Toutes vos démarches universitaires au même endroit." %}
-                </h2>
-                
-                <div class="mt-7 flex justify-center">
-                    <a href="{% url 'accounts:login_page' %}"
-                       class="btn btn-auto bg-white text-navy shadow-md hover:bg-navy-50
-                              active:scale-95 focus-visible:ring-white focus-visible:ring-offset-navy"
-                       data-modal-src="{% url 'accounts:login_page' %}"
-                       data-modal-title="{% trans 'Connexion' %}">
-                        {% trans "Accéder au portail" %}
-                    </a>
-                </div>
-            </div>
-        </section>
+        
     </main>
 
     {% include "components/public_footer.html" %}

@@ -3,12 +3,11 @@
 {# flex-1 : sur un viewport plus haut que le contenu, le footer        #}
 {# absorbe la hauteur restante (voir landing/index.html) — la bande      #}
 {# CTA → footer reste navy d'un bord à l'autre, sans décroche.           #}
-<footer class="landing-bleed flex grow flex-col bg-navy text-white/75">
-    <div class="mt-auto w-full max-w-shell mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-        
+<footer class="landing-bleed flex grow flex-col bg-navy/5 text-white">
+    <div class=" w-full max-w-shell mx-auto px-2 sm:px-4 lg:px-6 py-8 sm:py-10">
 
         {# --- Barre légale --- #}
-        <div class=" text-white/70 sm:mt-10">
+        <div class="text-center text-navy-900 sm:mt-10">
             <p>&copy; {% now "Y" %} {% trans "UnivReq — Tous droits réservés." %}</p>
         </div>
     </div>

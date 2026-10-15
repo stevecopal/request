@@ -1,106 +1,162 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
+
+{% block html_class %} app-shell{% endblock %}
 
 {% block title %}{% trans "Tableau de bord" %} — {{ block.super }}{% endblock %}
 
 {% block layout %}
-<div class="min-h-screen flex flex-col bg-background">
-    <!-- En-tête fixe (tous les écrans) -->
-    <header class="sticky top-0 z-40 bg-navy text-white shadow-sm">
-        <div class="max-w-shell mx-auto flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <!-- Marque -->
-            <a href="{% url 'accounts:dashboard' %}"
-               class="flex shrink-0 items-center gap-2.5">
+{# ==================================================================== #}
+{# Coque applicative authentifiée — barre latérale + en-tête + contenu.  #}
+{# Desktop (≥ lg) : barre latérale fixe, en-tête collant, petit pied.    #}
+{# Mobile  (< lg) : barre latérale en tiroir (menu), pied de page simple. #}
+{# Les entrées `nav_sections` sont générées côté serveur selon le rôle.  #}
+{# ==================================================================== #}
+<div class="flex min-h-screen w-full">
+
+    {# -------- Voile du tiroir mobile -------- #}
+    <div id="app-drawer-overlay"
+         class="fixed inset-0 z-40 hidden bg-slate-900/50 backdrop-blur-sm lg:hidden"
+         data-drawer-close
+         aria-hidden="true"></div>
+
+    {# ================= BARRE LATÉRALE ================= #}
+    <aside id="app-sidebar"
+           class="app-sidebar fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] -translate-x-full
+                  transition-transform duration-300 ease-out
+                  lg:sticky lg:top-0 lg:z-30 lg:h-screen lg:max-w-none lg:translate-x-0"
+           aria-label="{% trans 'Navigation latérale' %}">
+
+        {# Marque #}
+        <div class="app-sidebar__brand">
+            <a href="{% url 'accounts:dashboard' %}" class="flex min-w-0 items-center gap-3 rounded-xl">
                 <span class="brand-mark" aria-hidden="true">
-                    <svg class="w-6 h-6 text-white" viewBox="0 0 32 32" fill="none">
+                    <svg class="h-6 w-6 text-white" viewBox="0 0 32 32" fill="none">
                         <path d="M16 7 5 12.5 16 18l11-5.5L16 7Z" fill="currentColor"/>
                         <path d="M9 15.5v4.2c0 1.6 3.1 3.3 7 3.3s7-1.7 7-3.3v-4.2"
                               stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </span>
-                <span class="font-extrabold tracking-tight text-lg">{% trans "UnivReq" %}</span>
+                <span class="text-lg font-extrabold tracking-tight text-navy-dark">UnivReq</span>
             </a>
-
-            <!-- Navigation horizontale — desktop uniquement (≥ lg) -->
-            <nav class="hidden lg:flex flex-1 items-center gap-1"
-                 aria-label="{% trans 'Navigation principale' %}">
-                {% for item in nav_items %}
-                <button type="button"
-                        class="top-nav__item"
-                        {% if item.aria_current %}aria-current="page"{% endif %}
-                        {% if item.is_modal %}
-                        data-modal-src="{{ item.url }}"
-                        data-modal-title="{{ item.modal_title }}"
-                        {% else %}
-                        data-fragment-src="{{ item.url }}"
-                        {% endif %}>
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                         aria-hidden="true">{{ item.icon|safe }}</svg>
-                    {{ item.label }}
-                    {% if item.badge %}
-                    <span data-unread-badge
-                          class="ml-1 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
-                        {{ item.badge }}
-                    </span>
-                    {% endif %}
-                </button>
-                {% endfor %}
-            </nav>
-
-            <!-- Utilisateur -->
-            <div class="flex shrink-0 items-center gap-2.5">
-                <span class="hidden sm:inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium tabular-nums text-white/80">
-                    {{ request.user.get_full_name|default:request.user.username }}
-                </span>
-                <span class="w-9 h-9 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center text-sm font-bold text-white"
-                      aria-hidden="true">
-                    {{ request.user.last_name|default:request.user.username|first|upper }}
-                </span>
-            </div>
-        </div>
-    </header>
-
-    <!-- Configuration SPA -->
-    <div id="spa-config" class="hidden"
-         data-initial-fragment="{{ initial_fragment }}"
-         {% if needs_onboarding %}data-initial-modal="{{ onboarding_modal }}"
-         data-initial-modal-title="{% trans 'Compléter mon profil' %}"{% endif %}></div>
-
-    <!-- Viewport -->
-    <main id="spa-viewport"
-          class="flex-1 w-full px-4 pb-24 pt-6 sm:px-6 sm:pb-28 sm:pt-8 lg:px-8 lg:pb-0"
-          tabindex="-1"
-          aria-busy="true">
-        {% include "components/skeleton_list.html" %}
-    </main>
-
-    <!-- Navigation basse — mobile uniquement (< lg) -->
-    <nav class="bottom-nav" aria-label="{% trans 'Navigation principale' %}">
-        <div class="max-w-md mx-auto flex h-16">
-            {% for item in nav_items %}
             <button type="button"
-                    class="bottom-nav__item"
-                    {% if item.aria_current %}aria-current="page"{% endif %}
-                    {% if item.is_modal %}
-                    data-modal-src="{{ item.url }}"
-                    data-modal-title="{{ item.modal_title }}"
-                    {% else %}
-                    data-fragment-src="{{ item.url }}"
-                    {% endif %}>
-                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     aria-hidden="true">{{ item.icon|safe }}</svg>
-                <span>{{ item.label }}</span>
-                {% if item.badge %}
-                <span data-unread-badge
-                      class="absolute top-1 right-[calc(50%-1.6rem)] min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
-                    {{ item.badge }}
-                </span>
-                {% endif %}
+                    class="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400
+                           transition-colors hover:bg-slate-100 hover:text-navy-dark lg:hidden"
+                    data-drawer-close
+                    aria-label="{% trans 'Fermer le menu' %}">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
             </button>
-            {% endfor %}
         </div>
-    </nav>
+
+        {# Navigation par sections (dépendante du rôle) #}
+        <nav class="app-sidebar__nav" aria-label="{% trans 'Navigation principale' %}">
+            {% for section in nav_sections %}
+                <p class="app-nav__section">{{ section.label }}</p>
+                <ul class="space-y-1">
+                    {% for item in section.items %}
+                        <li>
+                            <button type="button"
+                                    class="app-nav__item"
+                                    {% if item.aria_current %}aria-current="page"{% endif %}
+                                    {% if item.is_modal %}
+                                    data-modal-src="{{ item.url }}"
+                                    data-modal-title="{{ item.modal_title }}"
+                                    {% else %}
+                                    data-fragment-src="{{ item.url }}"
+                                    {% endif %}>
+                                <span class="app-nav__icon" aria-hidden="true">
+                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2"
+                                         stroke-linecap="round" stroke-linejoin="round">
+                                        {{ item.icon|safe }}
+                                    </svg>
+                                </span>
+                                <span class="min-w-0 flex-1 text-left">
+                                    <span class="block truncate text-sm font-semibold">{{ item.label }}</span>
+                                    {% if item.description %}
+                                        <span class="app-nav__desc">{{ item.description }}</span>
+                                    {% endif %}
+                                </span>
+                                {% if item.badge %}
+                                    <span data-unread-badge class="app-nav__badge">{{ item.badge }}</span>
+                                {% endif %}
+                            </button>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endfor %}
+        </nav>
+
+        {# Déconnexion (unique, en bas de la barre latérale) #}
+        <div class="app-sidebar__user">
+            <button type="button"
+                    class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl
+                           border border-slate-200 text-sm font-semibold text-slate-600
+                           transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                    data-logout
+                    data-logout-url="{% url 'accounts:logout' %}">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <path d="m16 17 5-5-5-5M21 12H9"/>
+                </svg>
+                {% trans "Se déconnecter" %}
+            </button>
+        </div>
+    </aside>
+
+    {# ================= COLONNE PRINCIPALE ================= #}
+    <div class="flex min-w-0 flex-1 flex-col">
+
+        {# -------- En-tête : uniquement l'espace + la date -------- #}
+        <header class="app-topbar">
+            <button type="button"
+                    class="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-navy
+                           transition-colors hover:bg-navy-50 lg:hidden"
+                    data-drawer-open
+                    aria-controls="app-sidebar"
+                    aria-expanded="false"
+                    aria-label="{% trans 'Ouvrir le menu' %}">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M4 7h16M4 12h16M4 17h16"/>
+                </svg>
+            </button>
+
+            <span class="min-w-0 truncate text-base font-bold text-navy-dark sm:text-lg">
+                {% blocktrans %}Espace {{ role_label }}{% endblocktrans %}
+            </span>
+
+            <time class="ml-auto shrink-0 pl-3 text-xs font-medium capitalize text-slate-400 sm:text-sm">
+                {% now "l j F Y" %}
+            </time>
+        </header>
+
+        {# -------- Configuration SPA -------- #}
+        <div id="spa-config" class="hidden"
+             data-initial-fragment="{{ initial_fragment }}"
+             {% if needs_onboarding %}data-initial-modal="{{ onboarding_modal }}"
+             data-initial-modal-title="{% trans 'Compléter mon profil' %}"{% endif %}></div>
+
+        {# -------- Contenu (cible des fragments) -------- #}
+        <main id="spa-viewport"
+              class="app-content"
+              tabindex="-1"
+              aria-busy="true">
+            {% include "components/skeleton_list.html" %}
+        </main>
+
+        {# -------- Pied de page simple -------- #}
+        <footer class="app-footer justify-center text-center">
+            <p>&copy; {% now "Y" %} UnivReq — {% trans "Portail des requêtes universitaires" %}</p>
+        </footer>
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/dashboard_nav.js' %}"></script>
 {% endblock %}
