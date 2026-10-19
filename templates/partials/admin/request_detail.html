@@ -1,7 +1,7 @@
 {% load i18n %}
 {# C3 — Fiche détaillée d'une requête : contexte, historique, actions.        #}
 {# Chargeur : admin_console.js → #admin-request-detail (data-ticket-id).      #}
-<div class="rise space-y-4" data-ticket-id="{{ ticket.id }}">
+<div class="rise min-w-0 max-w-full space-y-4 overflow-x-clip" data-ticket-id="{{ ticket.id }}">
 
     {# ---- Barre mobile : retour à la liste (le détail s'ouvre sous la liste) ---- #}
     <div class="flex items-center justify-between gap-2 lg:hidden">
@@ -185,6 +185,11 @@
                             {{ comment.created_at|date:"d/m/Y H:i" }}
                         </p>
                         <p class="mt-1 whitespace-pre-line text-sm text-slate-700">{{ comment.body }}</p>
+                        {% if comment.file %}
+                            <p class="mt-1 text-xs text-slate-500">
+                                {% trans "Fichier joint" %} : {{ comment.file_basename }}
+                            </p>
+                        {% endif %}
                     </li>
                 {% endfor %}
             </ul>

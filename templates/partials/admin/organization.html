@@ -1,7 +1,7 @@
 {% load i18n %}
 {# C2 — Organisation : onglets (facultés → services) + liste + actions.      #}
 {# Désactivation douce uniquement : aucune suppression dans ce module.        #}
-<div class="rise space-y-4">
+<div class="rise min-w-0 max-w-full space-y-4 overflow-x-clip">
     <section class="dashboard-hero">
         <div class="relative z-10">
             <h1 class="text-2xl font-extrabold text-navy-dark sm:text-3xl">
@@ -32,7 +32,7 @@
     {# ---- Barre d'action d'ajout ---- #}
     <div class="card flex flex-wrap items-end gap-3 p-4">
         {% if tab == "member" %}
-            <div class="min-w-48 flex-1">
+            <div class="min-w-0 flex-1">
                 <label class="label" for="member-service">{% trans "Service" %}</label>
                 <select id="member-service"
                         class="field"

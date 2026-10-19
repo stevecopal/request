@@ -1,6 +1,6 @@
 {% load i18n %}
 {# C3 — Suivi central : filtres + liste (rafraîchissable) + panneau de détail. #}
-<div class="rise space-y-4">
+<div class="rise min-w-0 max-w-full space-y-4 overflow-x-clip">
     <section class="dashboard-hero">
         <div class="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div class="min-w-0">
@@ -123,8 +123,8 @@
     </form>
 
     {# ---- Liste + détail ---- #}
-    <div class="grid items-start gap-6 lg:grid-cols-5">
-        <div class="lg:col-span-2 scroll-mt-20"
+    <div class="grid min-w-0 items-start gap-6 lg:grid-cols-5">
+        <div class="min-w-0 scroll-mt-20 lg:col-span-2"
              id="admin-request-list"
              data-list-url="{% url 'core_scolarite:admin_requests_list' %}"
              data-active-qs="{{ active_qs }}"
@@ -133,7 +133,7 @@
         </div>
 
         <section id="admin-request-detail"
-                 class="hidden scroll-mt-20 lg:block lg:col-span-3 lg:sticky lg:top-20"
+                 class="hidden min-w-0 scroll-mt-20 lg:col-span-3 lg:sticky lg:top-20 lg:block"
                  aria-live="polite">
             <div class="card p-8 text-center text-slate-500">
                 <svg class="mx-auto h-10 w-10 text-navy-200" viewBox="0 0 24 24" fill="none"

@@ -66,4 +66,9 @@ urlpatterns = [
         teacher_dashboard.download_attachment,
         name="download_attachment",
     ),
+    path(
+        "comments/<uuid:pk>/file/",
+        teacher_dashboard.download_comment_file,
+        name="download_comment_file",
+    ),
 ]

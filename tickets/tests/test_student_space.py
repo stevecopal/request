@@ -1,7 +1,10 @@
 """Tests de l'espace étudiant : suivi, réponse MORE_INFO, filtres, sécurité."""
 
+import tempfile
+
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import Department, Faculty, Student, Teacher
@@ -137,11 +140,12 @@ class StudentDetailTests(StudentSpaceBase):
 
 
 class StudentReplyTests(StudentSpaceBase):
-    def _reply(self, ticket, body="Voici le relevé."):
+    def _reply(self, ticket, body="Voici le relevé.", extra=None):
         self.client.force_login(self.student.user)
-        return self.client.post(
-            "/tickets/ajax/reply/", {"ticket_id": ticket.id, "body": body}
-        )
+        data = {"ticket_id": ticket.id, "body": body}
+        if extra:
+            data.update(extra)
+        return self.client.post("/tickets/ajax/reply/", data)
 
     def test_reply_moves_more_info_to_processing(self):
         ticket = self._ticket(status=Ticket.Status.MORE_INFO)
@@ -167,6 +171,51 @@ class StudentReplyTests(StudentSpaceBase):
         ticket = self._ticket(student=self.other_student, status=Ticket.Status.MORE_INFO)
         response = self._reply(ticket)
         self.assertEqual(response.status_code, 404)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_reply_with_file_stores_attachment(self):
+        """L'étudiant joint le document demandé à sa réponse MORE_INFO."""
+        ticket = self._ticket(status=Ticket.Status.MORE_INFO)
+        response = self._reply(
+            ticket,
+            extra={
+                "file": SimpleUploadedFile(
+                    "releve.pdf", b"%PDF-1.4 test", content_type="application/pdf"
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        comment = TicketComment.objects.get(ticket=ticket)
+        self.assertTrue(comment.file)
+        self.assertEqual(comment.file_extension, "pdf")
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.PROCESSING)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_reply_rejects_forbidden_file_extension(self):
+        ticket = self._ticket(status=Ticket.Status.MORE_INFO)
+        response = self._reply(
+            ticket,
+            extra={
+                "file": SimpleUploadedFile(
+                    "evil.html", b"<b>hi</b>", content_type="text/html"
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.MORE_INFO)
+        self.assertEqual(TicketComment.objects.filter(ticket=ticket).count(), 0)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_reply_oversized_file_rejected(self):
+        ticket = self._ticket(status=Ticket.Status.MORE_INFO)
+        big = SimpleUploadedFile("big.pdf", b"x" * 1024, content_type="application/pdf")
+        with override_settings(MAX_UPLOAD_SIZE=512):
+            response = self._reply(ticket, extra={"file": big})
+        self.assertEqual(response.status_code, 400)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.MORE_INFO)
 
 
 class MoreInfoTransitionTests(StudentSpaceBase):

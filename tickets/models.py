@@ -201,6 +201,24 @@ class TicketComment(UUIDModel):
         default=Kind.STUDENT_REPLY,
     )
     is_internal = models.BooleanField(_("interne"), default=False)
+    # Fichier joint à un échange (ex. réponse de l'étudiant à une demande
+    # d'infos : il envoie le document demandé). Optionnel, consultable par
+    # l'enseignant assigné via le service de fichier protégé existant.
+    file = models.FileField(
+        _("fichier joint"),
+        upload_to=attachment_upload_to,
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    # Nom d'origine affichable : le chemin de stockage est réécrit en UUID
+    # (§9.4), donc on garde le nom lisible soumis par l'étudiant ici.
+    file_name = models.CharField(
+        _("nom du fichier"),
+        max_length=255,
+        blank=True,
+        default="",
+    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
 
     class Meta:
@@ -216,6 +234,26 @@ class TicketComment(UUIDModel):
         if self.author is None:
             return str(_("Inconnu"))
         return self.author.get_full_name() or self.author.username
+
+    @property
+    def file_extension(self) -> str:
+        """Extension du fichier joint à l'échange (vide si aucun)."""
+        name = self.file.name or "" if self.file else ""
+        return name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+    @property
+    def file_basename(self) -> str:
+        """Nom lisible du fichier joint (nom d'origine conservé à l'upload)."""
+        if self.file_name:
+            return self.file_name
+        if not self.file:
+            return ""
+        return (self.file.name or "").rsplit("/", 1)[-1]
+
+    @property
+    def is_image(self) -> bool:
+        """True si le fichier joint est une image consultable en aperçu."""
+        return self.file_extension in {"png", "jpg", "jpeg", "webp"}
 
     def __str__(self):
         return f"Commentaire {self.ticket.short_id} — {self.created_at:%d/%m/%Y %H:%M}"

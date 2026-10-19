@@ -1,6 +1,6 @@
 {% load i18n %}
 {# Console super-admin — indicateurs globaux et performance par faculté. #}
-<div class="rise space-y-6">
+<div class="rise min-w-0 max-w-full space-y-6 overflow-x-clip">
 
     {# ---- Bannière : identité + actions ---- #}
     <section class="dashboard-hero">
@@ -269,8 +269,7 @@
             <ul class="panel__body space-y-3 border-l-2 border-slate-100 pl-4">
                 {% for entry in recent %}
                     <li class="relative">
-                        <span class="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full bg-navy-200"
-                              aria-hidden="true"></span>
+                       
                         <p class="text-sm text-navy-dark">
                             <span class="font-semibold">{{ entry.ticket.student.full_name }}</span>
                             → {{ entry.get_to_status_display }}

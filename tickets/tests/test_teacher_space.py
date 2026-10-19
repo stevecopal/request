@@ -21,7 +21,7 @@ from accounts.models import Department, Faculty, Notification, Student, Teacher
 from accounts.tests.factories import make_university
 from core_scolarite.models import AttachmentConfig, Course, ProblemType
 from tickets.consumers import TicketConsumer
-from tickets.models import Ticket, TicketAttachment, TicketStatusHistory
+from tickets.models import Ticket, TicketAttachment, TicketComment, TicketStatusHistory
 
 
 class TeacherSpaceSetupMixin:
@@ -532,6 +532,76 @@ class TeacherAttachmentAccessTests(TeacherSpaceBase):
             response["Content-Disposition"].split(";")[0], "attachment"
         )
         self.assertEqual(response["Content-Type"], "application/octet-stream")
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class TeacherCommentFileAccessTests(TeacherSpaceBase):
+    """Fichier joint à la réponse MORE_INFO de l'étudiant : consultation enseignant."""
+
+    def setUp(self):
+        super().setUp()
+        self.ticket = self._ticket(status=Ticket.Status.MORE_INFO)
+        self.comment = TicketComment.objects.create(
+            ticket=self.ticket,
+            author=self.student.user,
+            body="Voici le document demandé.",
+            file=SimpleUploadedFile(
+                "releve.pdf", b"%PDF-1.4 test", content_type="application/pdf"
+            ),
+            file_name="releve.pdf",
+        )
+        self.url = f"/tickets/comments/{self.comment.id}/file/"
+
+    def test_assigned_teacher_downloads_comment_file(self):
+        self.client.force_login(self.teacher.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Disposition"].split(";")[0], "attachment"
+        )
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+
+    def test_assigned_teacher_consults_inline(self):
+        self.client.force_login(self.teacher.user)
+        response = self.client.get(self.url, {"inline": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response["Content-Disposition"].startswith("inline;"))
+
+    def test_owner_student_downloads_comment_file(self):
+        self.client.force_login(self.student.user)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_other_teacher_gets_403(self):
+        self.client.force_login(self.other_teacher.user)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_other_student_gets_403(self):
+        self.client.force_login(self.other_student.user)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_anonymous_gets_401(self):
+        self.assertEqual(self.client.get(self.url).status_code, 401)
+
+    def test_comment_without_file_returns_404(self):
+        bare = TicketComment.objects.create(
+            ticket=self.ticket, author=self.student.user, body="sans fichier"
+        )
+        self.client.force_login(self.teacher.user)
+        self.assertEqual(
+            self.client.get(f"/tickets/comments/{bare.id}/file/").status_code, 404
+        )
+
+    def test_detail_shows_file_links_for_teacher(self):
+        """La fiche enseignant affiche Consulter/Télécharger sur l'échange."""
+        self.client.force_login(self.teacher.user)
+        response = self.client.get(
+            f"/tickets/{self.ticket.id}/detail/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "releve.pdf")
+        self.assertContains(response, self.url)
 
 
 class TeacherConsumerTests(TeacherSpaceSetupMixin, TransactionTestCase):

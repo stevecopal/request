@@ -200,14 +200,19 @@
   .card {
     @apply bg-white rounded-2xl border border-slate-100 shadow-card
            transition-all duration-200;
+    min-width: 0;
+    max-width: 100%;
   }
   .card-hover {
     @apply hover:shadow-card-hover hover:border-navy-100 hover:-translate-y-0.5;
   }
 
-  /* --- Entrée en scène des fragments (chargement AJAX) --------------- */
+  /* Fracture responsive globale : aucune rangée flex/grid ne pousse la page.
+     Les enfants `min-w-0` + `overflow-wrap` absorbent les longs libellés. */
   .rise {
     @apply animate-rise;
+    min-width: 0;
+    max-width: 100%;
   }
   .rise-item:nth-child(1) { animation-delay: 0ms; }
   .rise-item:nth-child(2) { animation-delay: 60ms; }
@@ -536,6 +541,7 @@
   }
   .panel__body {
     @apply p-5;
+    min-width: 0;
   }
 
   .meter {
@@ -554,6 +560,18 @@
     overflow-x: hidden;
     scroll-padding-block: 0.75rem;
     -webkit-overflow-scrolling: touch;
+  }
+  /* Fragments admin + tableaux : défilement interne, jamais page entière. */
+  .app-content form,
+  .app-content nav,
+  .app-content ul,
+  .app-content section,
+  .app-content article,
+  .app-content div {
+    min-width: 0;
+  }
+  .app-content .overflow-x-auto {
+    max-width: 100%;
   }
   #modal-body form,
   #modal-body [data-field],

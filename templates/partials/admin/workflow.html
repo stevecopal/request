@@ -1,7 +1,7 @@
 {% load i18n %}
 {# C4 — Workflow : onglets de configuration (catégories, champs, règles…).    #}
 {# Les onglets liés à une catégorie travaillent sur `current_type` (scope).   #}
-<div class="rise space-y-4">
+<div class="rise min-w-0 max-w-full space-y-4 overflow-x-clip">
     <section class="dashboard-hero">
         <div class="relative z-10">
             <h1 class="text-2xl font-extrabold text-navy-dark sm:text-3xl">
@@ -33,7 +33,7 @@
     {# ---- Sélecteur de catégorie (onglets liés) ---- #}
     {% if type_dependent %}
         <div class="card flex flex-wrap items-end gap-3 p-4">
-            <div class="min-w-56 flex-1">
+            <div class="min-w-0 flex-1">
                 <label class="label" for="workflow-type">{% trans "Catégorie de requête" %}</label>
                 <select id="workflow-type"
                         name="type"

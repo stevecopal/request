@@ -16,6 +16,7 @@ Règle anti-falsification (IDOR) : le queryset est toujours filtré par
 une requête appartenant à un autre étudiant renvoie 404 (existence masquée).
 """
 
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import JsonResponse
@@ -245,11 +246,13 @@ def student_reply(request):
     """
     Réponse de l'étudiant à une demande d'informations complémentaires.
 
-    Crée un `TicketComment` puis fait muter MORE_INFO → PROCESSING (l'enseignant
-    retrouve la requête en cours d'analyse dans sa boîte).
+    Crée un `TicketComment` (avec éventuel fichier joint : le document demandé
+    par l'enseignant) puis fait muter MORE_INFO → PROCESSING (l'enseignant
+    retrouve la requête en cours d'analyse dans sa boîte et consulte le fichier).
     """
     ticket_id = request.POST.get("ticket_id")
     body = (request.POST.get("body") or "").strip()
+    uploaded = request.FILES.get("file")
 
     ticket = Ticket.objects.filter(pk=ticket_id, student=request.student).first()
     if ticket is None:
@@ -265,6 +268,37 @@ def student_reply(request):
             },
             status=400,
         )
+    # Fichier joint facultatif : mêmes frontières que la création de ticket
+    # (whitelist d'extensions + poids max, §5.3).
+    if uploaded is not None:
+        name = getattr(uploaded, "name", "") or ""
+        extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        if extension not in settings.ALLOWED_UPLOAD_EXTENSIONS:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": str(
+                        _(
+                            "Format de fichier non autorisé (autorisés : %(exts)s)."
+                        )
+                        % {"exts": ", ".join(settings.ALLOWED_UPLOAD_EXTENSIONS)}
+                    ),
+                    "errors": {"file": str(_("Format non autorisé."))},
+                },
+                status=400,
+            )
+        if uploaded.size > settings.MAX_UPLOAD_SIZE:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": str(
+                        _("Fichier trop volumineux (max %(mb)s Mo).")
+                        % {"mb": settings.MAX_UPLOAD_SIZE // (1024 * 1024)}
+                    ),
+                    "errors": {"file": str(_("Fichier trop volumineux."))},
+                },
+                status=400,
+            )
     if ticket.status != Ticket.Status.MORE_INFO:
         return JsonResponse(
             {
@@ -276,7 +310,13 @@ def student_reply(request):
             status=400,
         )
 
-    TicketComment.objects.create(ticket=ticket, author=request.user, body=body)
+    TicketComment.objects.create(
+        ticket=ticket,
+        author=request.user,
+        body=body,
+        file=uploaded,
+        file_name=(uploaded.name if uploaded else ""),
+    )
     try:
         apply_status(
             ticket,

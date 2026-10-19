@@ -805,3 +805,45 @@ def download_attachment(request, pk):
             f'attachment; filename="{attachment.file.name.rsplit("/", 1)[-1]}"'
         )
     return response
+
+
+@login_required_json
+def download_comment_file(request, pk):
+    """
+    Service de fichier protégé du fichier joint à un échange (commentaire).
+
+    Cas d'usage : réponse de l'étudiant à une demande d'informations
+    complémentaires — il dépose le document demandé, l'enseignant assigné le
+    consulte (`?inline=1`) ou le télécharge. Même contrôle d'appartenance que
+    les pièces jointes (propriétaire étudiant ou enseignant autorisé).
+    """
+    comment = get_object_or_404(
+        TicketComment.objects.select_related("ticket"),
+        pk=pk,
+    )
+    ticket, error = _get_accessible_ticket(request, comment.ticket_id)
+    if error:
+        return error
+    if not comment.file:
+        return JsonResponse(
+            {"status": "error", "message": str(_("Aucun fichier joint."))}, status=404
+        )
+
+    extension = comment.file_extension
+    inline = request.GET.get("inline") == "1" and extension in INLINE_CONTENT_TYPES
+
+    response = FileResponse(comment.file.open("rb"))
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, max-age=0"
+    if inline:
+        response["Content-Type"] = INLINE_CONTENT_TYPES[extension]
+        response["Content-Disposition"] = 'inline; filename="echange.%s"' % extension
+    else:
+        response["Content-Type"] = "application/octet-stream"
+        # Nom d'origine nettoyé pour l'en-tête (guillemets/retours ligne interdits).
+        display_name = (
+            comment.file_basename.replace('"', "").replace("\r", "").replace("\n", "")
+            or f"echange.{extension or 'bin'}"
+        )
+        response["Content-Disposition"] = f'attachment; filename="{display_name}"'
+    return response
