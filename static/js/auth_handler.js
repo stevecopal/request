@@ -224,6 +224,54 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function bindChangePassword(form) {
+    var errorBox = form.querySelector('#change-password-error');
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (errorBox) errorBox.classList.add('hidden');
+      var new1 = form.querySelector('[name=new_password1]');
+      var new2 = form.querySelector('[name=new_password2]');
+      if (new1 && new2 && new1.value !== new2.value) {
+        if (errorBox) {
+          errorBox.textContent = 'Les deux mots de passe ne correspondent pas.';
+          errorBox.classList.remove('hidden');
+        }
+        return;
+      }
+      var submit = form.querySelector('[type=submit]');
+      var formData = new FormData(form);
+      if (submit) submit.disabled = true;
+      try {
+        var url = form.getAttribute('data-password-url') || '/accounts/ajax/password/';
+        var response = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfFromForm(form) },
+          body: formData,
+          credentials: 'same-origin'
+        });
+        var data = await parseBodySafe(response);
+        if (response.ok) {
+          closeModal();
+          notify(data.message || 'Mot de passe modifie.', 'success');
+        } else {
+          if (errorBox) {
+            errorBox.textContent = data.message || 'Modification impossible.';
+            errorBox.classList.remove('hidden');
+          }
+          notify(data.message || 'Modification impossible.', 'error');
+        }
+      } catch (err) {
+        if (errorBox) {
+          errorBox.textContent = 'Connexion impossible. Reessayez dans un instant.';
+          errorBox.classList.remove('hidden');
+        }
+        notify('Modification impossible.', 'error');
+      } finally {
+        if (submit) submit.disabled = false;
+      }
+    });
+  }
+
   function wire(root) {
     if (!root || !root.querySelector) return;
     var loginForm = root.querySelector('#login-form');
@@ -235,6 +283,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (onboardingForm && !onboardingForm.dataset.wired) {
       onboardingForm.dataset.wired = '1';
       bindOnboarding(onboardingForm);
+    }
+    var passwordForm = root.querySelector('#change-password-form');
+    if (passwordForm && !passwordForm.dataset.wired) {
+      passwordForm.dataset.wired = '1';
+      bindChangePassword(passwordForm);
     }
   }
 

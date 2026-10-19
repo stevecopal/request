@@ -45,6 +45,21 @@ urlpatterns = [
         teacher_dashboard.teacher_decision_modal,
         name="teacher_decision_modal",
     ),
+    path(
+        "teacher/transfer/",
+        teacher_dashboard.teacher_transfer_modal,
+        name="teacher_transfer_modal",
+    ),
+    path(
+        "teacher/ajax/transfer/",
+        teacher_dashboard.teacher_transfer,
+        name="teacher_transfer",
+    ),
+    path(
+        "teacher/ajax/note/",
+        teacher_dashboard.teacher_add_note,
+        name="teacher_add_note",
+    ),
     path("<uuid:pk>/detail/", teacher_dashboard.ticket_detail, name="ticket_detail"),
     path(
         "<uuid:pk>/suivi/",

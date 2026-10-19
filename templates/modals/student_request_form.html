@@ -12,6 +12,8 @@ jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
       data-create-url="{% url 'tickets:create_ticket' %}"
       data-feed-url="{% url 'tickets:student_feed' %}">
     {% csrf_token %}
+    {# Champs dynamiques sérialisés en JSON avant soumission (ticket_lifecycle.js). #}
+    <input type="hidden" id="ticket-form-data" name="form_data" value="{}">
 
     {# ---- Étape 1 : saisie ---- #}
     <div id="ticket-form-fields" class="space-y-4">
@@ -44,7 +46,16 @@ jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
             </select>
         </div>
 
-        {# Zone dynamique : UE, enseignant et pièces jointes #}
+        <div>
+            <label class="label" for="ticket-subject">
+                {% trans "Objet" %} <span class="text-red-600" aria-hidden="true">*</span>
+            </label>
+            <input class="field" type="text" id="ticket-subject" name="subject" required
+                   maxlength="200"
+                   placeholder="{% trans 'Ex. Attestation de scolarité pour stage…' %}">
+        </div>
+
+        {# Zone dynamique : UE, enseignant, champs du type, pièces jointes #}
         <div id="dynamic-fields" class="space-y-4" aria-live="polite"></div>
 
         <div>
@@ -76,7 +87,14 @@ jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
 
     <p id="ticket-error" class="hidden text-sm font-medium text-red-600" role="alert"></p>
 
-    <button type="submit" class="btn btn-primary" id="ticket-submit">
-        {% trans "Prévisualiser la requête" %}
-    </button>
+    <div class="flex flex-wrap items-center gap-2">
+        <button type="submit" class="btn btn-primary flex-1" id="ticket-submit">
+            {% trans "Prévisualiser la requête" %}
+        </button>
+        <button type="button" class="btn btn-ghost !w-auto" id="ticket-draft-save"
+                data-draft-key="univreq_ticket_draft">
+            {% trans "Enregistrer le brouillon" %}
+        </button>
+    </div>
+    <p id="ticket-draft-status" class="hidden text-xs text-emerald-600" role="status"></p>
 </form>

@@ -26,17 +26,28 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Case, IntegerField, Q, Value, When
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.views.decorators.http import require_POST
 
 from accounts.decorators import login_required_json, teacher_required
 from accounts.spa import spa_page
-from accounts.models import Department, Faculty, Notification
-from core_scolarite.models import Course, ProblemType
-from tickets.models import Ticket, TicketAttachment, TicketStatusHistory
+from accounts.models import Department, Faculty, Notification, Teacher
+from core_scolarite.models import Course, ProblemType, Service, ServiceAssignment
+from core_scolarite.services import metrics
+from core_scolarite.services.decision_rights import may_decide
+from tickets.models import (
+    Ticket,
+    TicketAttachment,
+    TicketComment,
+    TicketStatusHistory,
+    TicketTransfer,
+)
 from tickets.services.status_machine import apply_status
 
 INBOX_PAGE_SIZE = 10
@@ -86,9 +97,75 @@ def _parse_date(raw):
         return None
 
 
+def _teacher_service_ids(teacher):
+    """Services actifs dont l'enseignant est membre (transmissions B6)."""
+    return ServiceAssignment.objects.filter(
+        user=teacher.user, is_active=True
+    ).values_list("service_id", flat=True)
+
+
 def _teacher_scope(teacher):
-    """Périmètre universitaire strict : uniquement les tickets assignés."""
-    return Ticket.objects.filter(teacher=teacher)
+    """Périmètre strict de l'enseignant.
+
+    Deux et seulement deux sources d'accès :
+      * il est l'enseignant **assigné** du dossier ;
+      * le dossier a été **transmis à un service** dont il est membre actif.
+    Aucun filtre « département » ou « faculté » n'élargit implicitement
+    l'accès : les permissions restent explicites.
+    """
+    return (
+        Ticket.objects.filter(
+            Q(teacher=teacher) | Q(assigned_service_id__in=_teacher_service_ids(teacher))
+        )
+        .distinct()
+    )
+
+
+def _teacher_can_access_ticket(teacher, ticket) -> bool:
+    """Contrôle objet (jamais uniquement un queryset) pour une fiche."""
+    if ticket.teacher_id == teacher.id:
+        return True
+    if not ticket.assigned_service_id:
+        return False
+    return ServiceAssignment.objects.filter(
+        service_id=ticket.assigned_service_id,
+        user=teacher.user,
+        is_active=True,
+    ).exists()
+
+
+def _sla_flags(tickets, university):
+    """(ids en retard, ids proches de l'échéance) pour la liste courante."""
+    overdue_ids = set()
+    due_soon_ids = set()
+    for ticket in tickets:
+        if ticket.status not in metrics.OPEN_STATUSES:
+            continue
+        if metrics.is_overdue(ticket, university):
+            overdue_ids.add(ticket.id)
+            continue
+        max_days, _, _ = metrics.thresholds(ticket, university)
+        if max_days - metrics.age_days(ticket) <= 1:
+            due_soon_ids.add(ticket.id)
+    return overdue_ids, due_soon_ids
+
+
+def _form_data_rows(ticket):
+    """Réponses dynamiques lisibles (libellés figés dans le snapshot)."""
+    snapshot = ticket.config_snapshot or {}
+    labels = {
+        field.get("key"): field.get("label") or field.get("key")
+        for field in snapshot.get("fields", [])
+        if field.get("key")
+    }
+    rows = []
+    for key, value in (ticket.form_data or {}).items():
+        if value in ("", None, []):
+            continue
+        if isinstance(value, bool):
+            value = str(_("Oui")) if value else str(_("Non"))
+        rows.append({"label": labels.get(key, key), "value": value})
+    return rows
 
 
 def _allowed_courses(teacher):
@@ -114,19 +191,28 @@ def _apply_teacher_filters(request, tickets):
     if query:
         active["q"] = query
         tickets = tickets.filter(
-            Q(description__icontains=query)
+            Q(subject__icontains=query)
+            | Q(description__icontains=query)
             | Q(problem_type__name__icontains=query)
             | Q(course__code__icontains=query)
             | Q(course__name__icontains=query)
             | Q(student__user__first_name__icontains=query)
             | Q(student__user__last_name__icontains=query)
             | Q(student__registration_number__icontains=query)
+            # N° de suivi = 8 premiers caractères de l'UUID (minuscules).
+            | Q(id__startswith=query.lower())
         )
 
+    # Statut : valeur unique ou liste CSV (deep-links du tableau de bord).
     status = (request.GET.get("status") or "").strip()
-    if status in Ticket.Status.values:
-        active["status"] = status
-        tickets = tickets.filter(status=status)
+    active_statuses = [
+        value
+        for value in (piece.strip() for piece in status.split(","))
+        if value in Ticket.Status.values
+    ]
+    if active_statuses:
+        active["status"] = ",".join(active_statuses)
+        tickets = tickets.filter(status__in=active_statuses)
 
     problem_type_id = _parse_uuid(request.GET.get("problem_type"))
     if problem_type_id:
@@ -168,11 +254,11 @@ def _filter_context(teacher, active):
         ProblemType.objects.filter(tickets__in=base).distinct().order_by("name")
     )
     faculties = (
-        Faculty.objects.filter(students__tickets__teacher=teacher)
+        Faculty.objects.filter(students__tickets__in=base)
         .distinct()
         .order_by("name")
     )
-    departments = Department.objects.filter(students__tickets__teacher=teacher)
+    departments = Department.objects.filter(students__tickets__in=base)
     if active.get("faculty"):
         departments = departments.filter(faculty_id=active["faculty"])
     departments = departments.distinct().order_by("name")
@@ -199,29 +285,77 @@ def teacher_home(request):
     en attente, en cours et terminées + nouvelles requêtes + notifications.
     """
     tickets = _teacher_scope(request.teacher)
+    university = request.teacher.university
+    assigned = tickets.count()
     stats = {
-        "total": tickets.count(),
+        "assigned": assigned,
+        "total": assigned,
         "new": tickets.filter(status=Ticket.Status.SENT).count(),
         "awaiting": tickets.filter(status=Ticket.Status.RECEIVED).count(),
         "in_progress": tickets.filter(status__in=IN_PROGRESS_STATUSES).count(),
         "done": tickets.filter(status__in=DONE_STATUSES).count(),
     }
+
+    # Délais : calcul par dossier (les règles SLA peuvent différer selon la
+    # catégorie de la requête). Le volume d'un enseignant reste faible.
+    open_tickets = list(
+        tickets.filter(status__in=metrics.OPEN_STATUSES).select_related(
+            "problem_type", "course", "student__user", "assigned_service"
+        )
+    )
+    overdue_tickets = []
+    due_soon_tickets = []
+    for ticket in open_tickets:
+        max_days, _, _ = metrics.thresholds(ticket, university)
+        age = metrics.age_days(ticket)
+        ticket.sla_max_days = max_days
+        ticket.sla_age_days = round(age, 1)
+        if metrics.is_overdue(ticket, university):
+            overdue_tickets.append(ticket)
+            continue
+        remaining = max_days - age
+        if remaining <= 1:
+            ticket.sla_days_left = max(0, round(remaining))
+            due_soon_tickets.append(ticket)
+
+    overdue_tickets.sort(key=lambda item: item.sla_age_days, reverse=True)
+    due_soon_tickets.sort(key=lambda item: item.sla_days_left)
+    stats["overdue"] = len(overdue_tickets)
+    stats["due_soon"] = len(due_soon_tickets)
+
     recent = (
-        tickets.select_related("course", "problem_type", "student__user")
+        tickets.select_related(
+            "course", "problem_type", "student__user", "assigned_service"
+        )
         .order_by(STATUS_PRIORITY, "-created_at")[:5]
     )
     unread = Notification.objects.filter(user=request.user, is_read=False).count()
+    notifications = Notification.objects.filter(user=request.user).order_by(
+        "-created_at"
+    )[:5]
     return render(
         request,
         "partials/teacher_home.html",
-        {"stats": stats, "recent": recent, "unread_notifications": unread},
+        {
+            "stats": stats,
+            "recent": recent,
+            "overdue_tickets": overdue_tickets[:5],
+            "due_soon_tickets": due_soon_tickets[:5],
+            "notifications": notifications,
+            "unread_notifications": unread,
+        },
     )
 
 
 def _render_teacher_list(request, teacher):
     """Logique partagée inbox / liste seule : filtrage, tri, pagination."""
     tickets = _teacher_scope(teacher).select_related(
-        "student__user", "course", "problem_type"
+        "student__user",
+        "student__faculty",
+        "student__department",
+        "course",
+        "problem_type",
+        "assigned_service",
     )
     tickets, active = _apply_teacher_filters(request, tickets)
     tickets = tickets.order_by(STATUS_PRIORITY, "-created_at")
@@ -249,12 +383,17 @@ def teacher_inbox(request):
         )
 
     page, active, paginator = _render_teacher_list(request, request.teacher)
+    overdue_ids, due_soon_ids = _sla_flags(
+        page.object_list, request.teacher.university
+    )
     context = {
         "page_obj": page,
         "tickets": page.object_list,
         "total_count": paginator.count,
         "inbox_list_url": reverse("tickets:teacher_inbox_list"),
         "active_qs": _active_querystring(active),
+        "overdue_ids": overdue_ids,
+        "due_soon_ids": due_soon_ids,
     }
     context.update(_filter_context(request.teacher, active))
     return render(request, "partials/teacher_inbox.html", context)
@@ -269,6 +408,9 @@ def teacher_inbox_list(request):
     chargement du fragment complet).
     """
     page, active, paginator = _render_teacher_list(request, request.teacher)
+    overdue_ids, due_soon_ids = _sla_flags(
+        page.object_list, request.teacher.university
+    )
     return render(
         request,
         "partials/teacher_inbox_list.html",
@@ -278,6 +420,8 @@ def teacher_inbox_list(request):
             "total_count": paginator.count,
             "active": active,
             "active_qs": _active_querystring(active),
+            "overdue_ids": overdue_ids,
+            "due_soon_ids": due_soon_ids,
         },
     )
 
@@ -292,9 +436,16 @@ def _get_accessible_ticket(request, pk):
             "teacher__user",
             "course",
             "problem_type",
+            "assigned_service",
         )
         .prefetch_related(
-            "status_history__actor", "attachments__config", "comments__author"
+            "status_history__actor",
+            "attachments__config",
+            "comments__author",
+            "transfers__from_teacher__user",
+            "transfers__to_teacher__user",
+            "transfers__to_service",
+            "transfers__actor",
         )
         .filter(pk=pk)
         .first()
@@ -308,16 +459,32 @@ def _get_accessible_ticket(request, pk):
     teacher_profile = getattr(request.user, "teacher_profile", None)
     if student_profile and ticket.student_id == student_profile.id:
         return ticket, None
-    if teacher_profile and ticket.teacher_id == teacher_profile.id:
+    if teacher_profile and _teacher_can_access_ticket(teacher_profile, ticket):
         return ticket, None
     return None, JsonResponse(
         {"status": "error", "message": str(_("Accès non autorisé."))}, status=403
     )
 
 
+def _teacher_ticket_or_error(request, raw_id):
+    """Ticket accessible à l'enseignant connecté, ou réponse JSON d'erreur."""
+    ticket_id = _parse_uuid(raw_id)
+    if ticket_id is None:
+        return None, JsonResponse(
+            {"status": "error", "message": str(_("Identifiant de requête invalide."))},
+            status=400,
+        )
+    return _get_accessible_ticket(request, ticket_id)
+
+
 @teacher_required
 def teacher_decision_modal(request):
-    """Fragment de la modale de décision (Valider / Rejeter / Plus d'infos)."""
+    """Fragment de la modale de décision (Valider / Rejeter / Plus d'infos).
+
+    Le droit est vérifié par `may_decide` : enseignant assigné, ou périmètre
+    élargi explicitement par une règle de workflow. Un simple membre du
+    service sans règle de décision ne peut donc pas clôturer le dossier.
+    """
     ticket_id = request.GET.get("ticket_id")
     target = request.GET.get("target")
     allowed_targets = [Ticket.Status.RESOLVED, Ticket.Status.REJECTED]
@@ -328,10 +495,12 @@ def teacher_decision_modal(request):
             {"status": "error", "message": str(_("Cible de décision invalide."))},
             status=400,
         )
-    ticket = Ticket.objects.filter(pk=ticket_id, teacher=request.teacher).first()
-    if ticket is None:
+    ticket, error = _teacher_ticket_or_error(request, ticket_id)
+    if error:
+        return error
+    if not may_decide(request.user, ticket, new_status=target):
         return JsonResponse(
-            {"status": "error", "message": str(_("Requête introuvable."))}, status=404
+            {"status": "error", "message": str(_("Action non autorisée."))}, status=403
         )
     return render(
         request,
@@ -343,27 +512,344 @@ def teacher_decision_modal(request):
 @spa_page
 @login_required_json
 def ticket_detail(request, pk):
-    """Fragment de détail d'un ticket (propriétaire ou enseignant assigné).
+    """Fiche détaillée d'un ticket (propriétaire ou enseignant autorisé).
 
-    `can_decide` est True uniquement pour l'enseignant assigné : seules ses
-    actions de décision sont rendues (jamais chez l'étudiant propriétaire,
-    qui ne dispose que du suivi).
+    * `is_teacher_view` : l'utilisateur est l'enseignant assigné ou un membre
+      actif du service destinataire ; il voit alors les notes internes.
+    * `can_decide` : uniquement si `may_decide` l'autorise (jamais déduit du
+      seul rôle « enseignant »).
+    * côté étudiant, les commentaires internes sont filtrés côté serveur.
     """
     ticket, error = _get_accessible_ticket(request, pk)
     if error:
         return error
     teacher_profile = getattr(request.user, "teacher_profile", None)
-    can_decide = bool(
-        teacher_profile is not None and ticket.teacher_id == teacher_profile.id
+    is_teacher_view = bool(
+        teacher_profile is not None
+        and _teacher_can_access_ticket(teacher_profile, ticket)
     )
+    can_decide = bool(
+        is_teacher_view and may_decide(request.user, ticket)
+    )
+    comments = (
+        ticket.comments.all()
+        if is_teacher_view
+        else ticket.comments.filter(is_internal=False)
+    )
+
+    sla = None
+    if is_teacher_view:
+        university = teacher_profile.university
+        max_days, blocked_days, _policy = metrics.thresholds(ticket, university)
+        age = metrics.age_days(ticket)
+        sla = {
+            "overdue": metrics.is_overdue(ticket, university),
+            "blocked": metrics.is_blocked(ticket, university),
+            "max_days": max_days,
+            "blocked_days": blocked_days,
+            "age_days": round(age, 1),
+            "days_left": max(0, round(max_days - age, 1)),
+        }
+
     return render(
         request,
         "partials/teacher_ticket_detail.html",
         {
             "ticket": ticket,
-            "more_info_enabled": settings.ENABLE_TEACHER_MORE_INFO,
+            "comments": comments,
+            "is_teacher_view": is_teacher_view,
             "can_decide": can_decide,
+            "can_transfer": is_teacher_view and ticket.is_open,
+            "more_info_enabled": settings.ENABLE_TEACHER_MORE_INFO,
+            "sla": sla,
+            "form_data_rows": _form_data_rows(ticket),
+            "note_kinds": [
+                (TicketComment.Kind.INTERNAL_NOTE, _("Note interne")),
+                (TicketComment.Kind.OPINION_FAVORABLE, _("Avis favorable")),
+                (TicketComment.Kind.OPINION_UNFAVORABLE, _("Avis défavorable")),
+                (TicketComment.Kind.RECOMMENDATION, _("Recommandation")),
+                (TicketComment.Kind.ANOMALY, _("Signaler une anomalie")),
+            ],
         },
+    )
+
+
+@teacher_required
+def teacher_transfer_modal(request):
+    """Modale de transmission (B6) : intervenant et/ou service destinataire."""
+    ticket, error = _teacher_ticket_or_error(request, request.GET.get("ticket_id"))
+    if error:
+        return error
+    if not ticket.is_open:
+        return JsonResponse(
+            {"status": "error", "message": str(_("Ce dossier est déjà clôturé."))},
+            status=400,
+        )
+    university = (
+        ticket.student.faculty.university
+        if ticket.student.faculty_id
+        else request.teacher.university
+    )
+    services = Service.objects.filter(
+        university=university, is_active=True
+    ).order_by("name")
+    teachers = (
+        Teacher.objects.filter(faculty__university=university)
+        .exclude(pk=request.teacher.pk)
+        .select_related("user", "department")
+        .order_by("user__last_name", "user__first_name")
+    )
+    return render(
+        request,
+        "modals/teacher_transfer.html",
+        {
+            "ticket": ticket,
+            "services": services,
+            "teachers": teachers,
+        },
+    )
+
+
+@require_POST
+@teacher_required
+def teacher_transfer(request):
+    """Transmet un dossier à un intervenant et/ou à un service, avec motif.
+
+    Vérifications serveur : ticket accessible, motif obligatoire, au moins
+    une destination, cibles de la **même université**. Une transmission à un
+    intervenant change l'enseignant assigné ; une transmission à un service
+    ouvre le dossier aux membres actifs du service.
+    """
+    ticket, error = _teacher_ticket_or_error(request, request.POST.get("ticket_id"))
+    if error:
+        return error
+    if not ticket.is_open:
+        return JsonResponse(
+            {"status": "error", "message": str(_("Ce dossier est déjà clôturé."))},
+            status=400,
+        )
+
+    reason = (request.POST.get("reason") or "").strip()
+    if not reason:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": str(_("Le motif de la transmission est obligatoire.")),
+                "errors": {"reason": str(_("Champ obligatoire."))},
+            },
+            status=400,
+        )
+
+    to_teacher_id = _parse_uuid(request.POST.get("to_teacher"))
+    to_service_id = _parse_uuid(request.POST.get("to_service"))
+    if to_teacher_id is None and to_service_id is None:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": str(
+                    _("Choisissez un intervenant ou un service destinataire.")
+                ),
+            },
+            status=400,
+        )
+
+    university = (
+        ticket.student.faculty.university
+        if ticket.student.faculty_id
+        else request.teacher.university
+    )
+    to_teacher = None
+    to_service = None
+    if to_teacher_id is not None:
+        to_teacher = (
+            Teacher.objects.select_related("user", "faculty")
+            .filter(pk=to_teacher_id, faculty__university=university)
+            .first()
+        )
+        if to_teacher is None:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": str(_("Intervenant destinataire introuvable.")),
+                },
+                status=400,
+            )
+    if to_service_id is not None:
+        to_service = Service.objects.filter(
+            pk=to_service_id, university=university, is_active=True
+        ).first()
+        if to_service is None:
+            return JsonResponse(
+                {"status": "error", "message": str(_("Service destinataire introuvable."))},
+                status=400,
+            )
+
+    if to_teacher is not None and to_teacher.id == ticket.teacher_id and to_service is None:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": str(_("Ce dossier est déjà assigné à cet intervenant.")),
+            },
+            status=400,
+        )
+
+    with transaction.atomic():
+        locked = (
+            Ticket.objects.select_for_update()
+            .select_related("teacher__user", "student__user", "problem_type")
+            .get(pk=ticket.pk)
+        )
+        from_teacher = locked.teacher
+        if to_teacher is not None:
+            locked.teacher = to_teacher
+        if to_service is not None:
+            locked.assigned_service = to_service
+        elif to_teacher is not None:
+            # Transmission directe à un intervenant : la file du service
+            # précédent ne doit plus élargir l'accès au dossier.
+            locked.assigned_service = None
+
+        target_label = " · ".join(
+            item
+            for item in (
+                to_teacher.full_name if to_teacher is not None else "",
+                to_service.name if to_service is not None else "",
+            )
+            if item
+        )
+        locked._actor_user_id = request.user.id
+        locked._notification_title = (
+            _("Nouvelle affectation")
+            if to_teacher is not None
+            else _("Dossier transmis à un service")
+        )
+        locked.save(update_fields=["teacher", "assigned_service", "updated_at"])
+
+        TicketTransfer.objects.create(
+            ticket=locked,
+            from_teacher=from_teacher,
+            to_teacher=to_teacher,
+            to_service=to_service,
+            reason=reason,
+            actor=request.user,
+        )
+        TicketStatusHistory.objects.create(
+            ticket=locked,
+            from_status=locked.status,
+            to_status=locked.status,
+            actor=request.user,
+            actor_role=TicketStatusHistory.ActorRole.TEACHER,
+            note=str(_("Transmis à %(target)s — %(reason)s"))
+            % {"target": target_label, "reason": reason},
+        )
+
+        # L'ancien enseignant garde une trace dans son centre de notifications
+        # même s'il perd l'accès au dossier après la transmission.
+        if from_teacher.user_id != request.user.id:
+            Notification.objects.create(
+                user=from_teacher.user,
+                ticket=locked,
+                title=str(_("Dossier transféré")),
+                body=f"{locked.problem_type} — {target_label}",
+            )
+
+    return JsonResponse(
+        {
+            "status": "success",
+            "message": str(_("Dossier transmis à %(target)s."))
+            % {"target": target_label},
+            "ticket": {
+                "id": str(locked.id),
+                "status": locked.status,
+                "status_label": locked.status_label,
+            },
+        }
+    )
+
+
+@require_POST
+@teacher_required
+def teacher_add_note(request):
+    """Ajoute une analyse interne : note, avis, recommandation ou anomalie.
+
+    Ces contenus sont toujours `is_internal=True` : ils ne sont jamais rendus
+    dans l'espace étudiant. Une anomalie escalade en plus le dossier pour la
+    console d'administration, sans notifier l'étudiant.
+    """
+    ticket, error = _teacher_ticket_or_error(request, request.POST.get("ticket_id"))
+    if error:
+        return error
+
+    allowed_kinds = {
+        TicketComment.Kind.INTERNAL_NOTE,
+        TicketComment.Kind.OPINION_FAVORABLE,
+        TicketComment.Kind.OPINION_UNFAVORABLE,
+        TicketComment.Kind.RECOMMENDATION,
+        TicketComment.Kind.ANOMALY,
+    }
+    kind = (request.POST.get("kind") or TicketComment.Kind.INTERNAL_NOTE).strip()
+    if kind not in allowed_kinds:
+        return JsonResponse(
+            {"status": "error", "message": str(_("Type d'analyse invalide."))},
+            status=400,
+        )
+    body = (request.POST.get("body") or "").strip()
+    if not body:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": str(_("Le contenu de l'analyse est obligatoire.")),
+                "errors": {"body": str(_("Champ obligatoire."))},
+            },
+            status=400,
+        )
+    if len(body) > 5000:
+        return JsonResponse(
+            {"status": "error", "message": str(_("Le texte est trop long (5000 caractères maximum)."))},
+            status=400,
+        )
+
+    comment = TicketComment.objects.create(
+        ticket=ticket,
+        author=request.user,
+        body=body,
+        kind=kind,
+        is_internal=True,
+    )
+
+    if kind == TicketComment.Kind.ANOMALY:
+        now = timezone.now()
+        # `update()` volontaire : pas de post_save, donc aucune notification
+        # étudiante pour une remontée interne.
+        Ticket.objects.filter(pk=ticket.pk).update(
+            is_escalated=True, escalated_at=now
+        )
+        TicketStatusHistory.objects.create(
+            ticket=ticket,
+            from_status=ticket.status,
+            to_status=ticket.status,
+            actor=request.user,
+            actor_role=TicketStatusHistory.ActorRole.TEACHER,
+            note=str(_("Anomalie signalée : %(body)s")) % {"body": body[:500]},
+        )
+
+    messages = {
+        TicketComment.Kind.INTERNAL_NOTE: _("Note interne enregistrée."),
+        TicketComment.Kind.OPINION_FAVORABLE: _("Avis favorable enregistré."),
+        TicketComment.Kind.OPINION_UNFAVORABLE: _("Avis défavorable enregistré."),
+        TicketComment.Kind.RECOMMENDATION: _("Recommandation enregistrée."),
+        TicketComment.Kind.ANOMALY: _("Anomalie signalée et dossier escaladé."),
+    }
+    return JsonResponse(
+        {
+            "status": "success",
+            "message": str(messages.get(kind, _("Analyse enregistrée."))),
+            "comment": {
+                "id": str(comment.id),
+                "kind": comment.kind,
+                "kind_label": comment.get_kind_display(),
+            },
+        }
     )
 
 

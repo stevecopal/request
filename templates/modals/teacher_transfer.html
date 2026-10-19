@@ -1,0 +1,64 @@
+{% load i18n %}
+{# B6 — Transmission d'un dossier à un intervenant et/ou à un service. #}
+<form id="teacher-transfer-form" class="space-y-4" novalidate
+      data-transfer-url="{% url 'tickets:teacher_transfer' %}"
+      data-detail-url="{% url 'tickets:ticket_detail' ticket.id %}"
+      data-inbox-url="{% url 'tickets:teacher_inbox' %}">
+    {% csrf_token %}
+    <input type="hidden" name="ticket_id" value="{{ ticket.id }}">
+
+    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+        <p class="font-semibold text-navy-dark">{{ ticket.problem_type.name }}</p>
+        <p class="mt-1 text-xs text-slate-500">
+            {% trans "Étudiant" %} : {{ ticket.student.full_name }} ·
+            {% trans "Assigné à" %} : {{ ticket.teacher.full_name }}
+        </p>
+        {% if ticket.assigned_service %}
+            <p class="mt-1 text-xs text-slate-500">
+                {% trans "Service actuellement destinataire" %} : {{ ticket.assigned_service.name }}
+            </p>
+        {% endif %}
+    </div>
+
+    <div>
+        <label class="label" for="transfer-teacher">{% trans "Intervenant destinataire" %}</label>
+        <select class="field" id="transfer-teacher" name="to_teacher">
+            <option value="">{% trans "Aucun intervenant précis" %}</option>
+            {% for teacher in teachers %}
+                <option value="{{ teacher.id }}">
+                    {{ teacher.full_name }} — {{ teacher.department.name }}
+                </option>
+            {% endfor %}
+        </select>
+        <p class="helper">{% trans "Le dossier sera réassigné à cet enseignant." %}</p>
+    </div>
+
+    <div>
+        <label class="label" for="transfer-service">{% trans "Service destinataire" %}</label>
+        <select class="field" id="transfer-service" name="to_service">
+            <option value="">{% trans "Aucun service" %}</option>
+            {% for service in services %}
+                <option value="{{ service.id }}">{{ service.name }}</option>
+            {% endfor %}
+        </select>
+        <p class="helper">{% trans "Les membres actifs du service pourront consulter le dossier." %}</p>
+    </div>
+
+    <div>
+        <label class="label" for="transfer-reason">
+            {% trans "Motif de la transmission" %}
+            <span class="text-red-600" aria-hidden="true">*</span>
+        </label>
+        <textarea class="field min-h-24" id="transfer-reason" name="reason" rows="3" required
+                  placeholder="{% trans 'Expliquez pourquoi le dossier est transmis…' %}"></textarea>
+    </div>
+
+    <p class="helper">
+        {% trans "Choisissez au moins un destinataire (intervenant ou service)." %}
+    </p>
+    <p id="transfer-error" class="hidden text-sm font-medium text-red-600" role="alert"></p>
+
+    <button type="submit" class="btn btn-primary">
+        {% trans "Transmettre le dossier" %}
+    </button>
+</form>

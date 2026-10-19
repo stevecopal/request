@@ -8,13 +8,25 @@
 
     <div>
         <label class="label" for="manual-entity">{% trans "Type de compte" %}</label>
-        <select class="field" id="manual-entity" name="entity">
+        <select class="field" id="manual-entity" name="entity" data-role-select>
             <option value="students">{% trans "Étudiant" %}</option>
             <option value="teachers">{% trans "Enseignant" %}</option>
         </select>
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
+    
+    <div data-title-field>
+        <label class="label" for="manual-title">{% trans "Titre (enseignant)" %}</label>
+        <select class="field" id="manual-title" name="title">
+            <option value="">—</option>
+            <option value="DR">{% trans "Dr." %}</option>
+            <option value="PR">{% trans "Pr." %}</option>
+            <option value="MR">{% trans "M." %}</option>
+            <option value="MME">{% trans "Mme" %}</option>
+        </select>
+    </div>
+
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
             <label class="label" for="manual-first">{% trans "Prénom" %}</label>
             <input class="field" id="manual-first" name="first_name" type="text" required>
@@ -34,17 +46,6 @@
     <div>
         <label class="label" for="manual-email">{% trans "Email" %}</label>
         <input class="field" id="manual-email" name="email" type="email" required>
-    </div>
-
-    <div>
-        <label class="label" for="manual-title">{% trans "Titre (enseignant)" %}</label>
-        <select class="field" id="manual-title" name="title">
-            <option value="">—</option>
-            <option value="DR">{% trans "Dr." %}</option>
-            <option value="PR">{% trans "Pr." %}</option>
-            <option value="MR">{% trans "M." %}</option>
-            <option value="MME">{% trans "Mme" %}</option>
-        </select>
     </div>
 
     <div>

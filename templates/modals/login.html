@@ -1,7 +1,7 @@
 {% load i18n %}
 {# Corps de la modale de connexion — wiring AJAX assuré par auth_handler.js (P4) #}
 {# method="post" + action obligatoires : sans JS, aucune donnée ne part en query string. #}
-<form id="login-form" class="space-y-4" novalidate
+<form id="login-form" class="space-y-3 sm:space-y-4" novalidate
       method="post"
       action="{% url 'accounts:login' %}"
       data-login-url="{% url 'accounts:login' %}">
@@ -18,6 +18,7 @@
                inputmode="text"
                autocomplete="username"
                autocapitalize="characters"
+               enterkeyhint="next"
                spellcheck="false"
                placeholder="{% trans 'Ex. ETU001' %}"
                required>
@@ -33,6 +34,7 @@
                name="password"
                type="password"
                autocomplete="current-password"
+               enterkeyhint="go"
                placeholder="••••••••"
                required>
        

@@ -176,6 +176,53 @@ def onboarding(request):
 
 @require_POST
 @login_required_json
+def change_password(request):
+    """
+    Changement de mot de passe de l'utilisateur connecté (A6).
+
+    Contrôles : mot actuel vérifié, nouveau mot de passe conforme (8 car. min.)
+    et confirmation identique. Le mot de passe n'est jamais journalisé.
+    """
+    current = request.POST.get("current_password") or ""
+    new1 = request.POST.get("new_password1") or ""
+    new2 = request.POST.get("new_password2") or ""
+
+    if not current or not new1 or not new2:
+        return _error(
+            _("Tous les champs sont obligatoires."),
+            errors={
+                "current_password": str(_("Champ obligatoire.")) if not current else "",
+                "new_password1": str(_("Champ obligatoire.")) if not new1 else "",
+                "new_password2": str(_("Champ obligatoire.")) if not new2 else "",
+            },
+        )
+    if not request.user.check_password(current):
+        return _error(
+            _("Mot de passe actuel incorrect."),
+            errors={"current_password": str(_("Mot de passe incorrect."))},
+        )
+    if len(new1) < 8:
+        return _error(
+            _("Le nouveau mot de passe doit contenir au moins 8 caractères."),
+            errors={"new_password1": str(_("Minimum 8 caractères."))},
+        )
+    if new1 != new2:
+        return _error(
+            _("Les deux nouveaux mots de passe ne correspondent pas."),
+            errors={"new_password2": str(_("Les mots de passe ne correspondent pas."))},
+        )
+
+    request.user.set_password(new1)
+    request.user.save(update_fields=["password"])
+    # La session conserve l'utilisateur connecté après rotation du hash.
+    request.session.cycle_key()
+    return JsonResponse(
+        {"status": "success", "message": _("Mot de passe modifié avec succès.")}
+    )
+
+
+@require_POST
+@login_required_json
 def push_subscribe(request):
     """Enregistre un abonnement Web Push pour l'utilisateur connecté."""
     if not webpush.is_configured():

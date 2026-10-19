@@ -8,14 +8,16 @@ choisis côté serveur, jamais par un paramètre client.
 
 from django.conf import settings
 from django.contrib.auth import logout as auth_logout
+from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
 
 from accounts.decorators import login_required_json, student_required
 from accounts.models import Faculty
-from accounts.spa import build_dashboard_context, spa_page
+from accounts.spa import build_dashboard_context, is_fragment_request, spa_page
 from accounts.utils import ROLE_STUDENT, role_name
+from core_scolarite.models import Course, ServiceAssignment
 
 
 def _prime_csrf_cookie(request):
@@ -32,11 +34,19 @@ def landing_page(request):
 
 
 def login_fragment(request):
-    """Fragment du corps de la modale de connexion (injecté dans #modal-body)."""
+    """Connexion : fragment pour la modale, page complète en accès direct.
+
+    La modale AJAX injecte uniquement le corps du formulaire. Ouverte par
+    URL directe (F5, favori, lien partagé), la même route doit renvoyer une
+    page stylée : sinon le navigateur affiche un fragment brut, sans
+    `<meta viewport>` ni feuille de style — illisible sur mobile.
+    """
     if request.user.is_authenticated:
         return redirect("accounts:dashboard")
     _prime_csrf_cookie(request)
-    return render(request, "modals/login.html")
+    if is_fragment_request(request):
+        return render(request, "modals/login.html")
+    return render(request, "login/page.html")
 
 
 def dashboard_shell(request):
@@ -65,7 +75,23 @@ def profile_fragment(request):
     if role == ROLE_STUDENT:
         context["student"] = request.user.student_profile
     elif role == "teacher":
-        context["teacher"] = request.user.teacher_profile
+        teacher = request.user.teacher_profile
+        context["teacher"] = teacher
+        # Rattachements professionnels (B9) : cours dont il est responsable
+        # ou affecté, et services dont il est membre actif.
+        context["teacher_courses"] = (
+            Course.objects.filter(
+                Q(primary_instructor=teacher)
+                | Q(assignments__teacher=teacher, assignments__is_active=True)
+            )
+            .distinct()
+            .order_by("code")
+        )
+        context["teacher_services"] = (
+            ServiceAssignment.objects.filter(user=request.user, is_active=True)
+            .select_related("service")
+            .order_by("service__name")
+        )
     return render(request, "partials/profile.html", context)
 
 
@@ -91,3 +117,9 @@ def onboarding_modal(request):
             "student": request.student,
         },
     )
+
+
+@login_required_json
+def change_password_modal(request):
+    """Fragment de la modale « Changer mon mot de passe » (A6)."""
+    return render(request, "modals/change_password.html")

@@ -13,7 +13,7 @@ Demander des infos (MORE_INFO + question obligatoire)
 
     <p class="text-sm text-slate-600">
         {% if target == 'RESOLVED' %}
-            {% trans "Confirmez la validation de cette requête. L'étudiant en sera notifié immédiatement." %}
+            {% trans "Rédigez la réponse visible par l'étudiant : elle lui sera transmise avec la notification de validation." %}
         {% elif target == 'MORE_INFO' %}
             {% trans "Décrivez les informations demandées : l'étudiant pourra vous répondre depuis son suivi." %}
         {% else %}
@@ -21,7 +21,16 @@ Demander des infos (MORE_INFO + question obligatoire)
         {% endif %}
     </p>
 
-    {% if target == 'REJECTED' %}
+    {% if target == 'RESOLVED' %}
+        <div>
+            <label class="label" for="decision-resolution-note">
+                {% trans "Réponse à l'étudiant" %} <span class="text-red-600" aria-hidden="true">*</span>
+            </label>
+            <textarea class="field min-h-24" id="decision-resolution-note" name="resolution_note"
+                      rows="3" required
+                      placeholder="{% trans 'Ex. : votre attestation a été générée, elle est disponible au service de la scolarité…' %}"></textarea>
+        </div>
+    {% elif target == 'REJECTED' %}
         <div>
             <label class="label" for="decision-reason">
                 {% trans "Motif du rejet" %} <span class="text-red-600" aria-hidden="true">*</span>

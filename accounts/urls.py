@@ -41,6 +41,16 @@ urlpatterns = [
         name="notifications_read",
     ),
     path("accounts/onboarding/", base.onboarding_modal, name="onboarding_modal"),
+    path(
+        "accounts/password/",
+        base.change_password_modal,
+        name="change_password_modal",
+    ),
+    path(
+        "accounts/ajax/password/",
+        ajax_actions.change_password,
+        name="change_password",
+    ),
     path("accounts/ajax/departments/", ajax_actions.departments, name="departments"),
     path("accounts/ajax/onboarding/", ajax_actions.onboarding, name="onboarding"),
     path(

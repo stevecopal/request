@@ -52,11 +52,17 @@ def _matches(rule: DecisionRule, user, ticket) -> bool:
     if scope == DecisionRule.Scope.ADMIN:
         return bool(user.is_superuser)
     if scope == DecisionRule.Scope.SERVICE:
-        service = ticket.problem_type.service
-        if service is None:
+        # Membres du service responsable du type OU du service destinataire
+        # après transmission B6 (ticket.assigned_service).
+        service_ids = set()
+        if ticket.problem_type.service_id:
+            service_ids.add(ticket.problem_type.service_id)
+        if ticket.assigned_service_id:
+            service_ids.add(ticket.assigned_service_id)
+        if not service_ids:
             return False
         return ServiceAssignment.objects.filter(
-            service=service, user=user, is_active=True
+            service_id__in=service_ids, user=user, is_active=True
         ).exists()
     if scope == DecisionRule.Scope.DEPARTMENT:
         teacher = getattr(user, "teacher_profile", None)

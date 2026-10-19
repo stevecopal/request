@@ -45,6 +45,7 @@ class TicketHistoryTests(TestCase):
             teacher=self.teacher,
             course=self.course,
             problem_type=self.problem,
+            subject="Objet test",
             description="desc",
             status=status,
         )
@@ -54,6 +55,7 @@ class TicketHistoryTests(TestCase):
             ticket = create_student_ticket(
                 student_profile=self.student,
                 problem_type_id=self.problem.id,
+                subject="Note manquante",
                 description="Ma note manque.",
                 uploaded_files_dict={
                     str(self.config.id): SimpleUploadedFile(

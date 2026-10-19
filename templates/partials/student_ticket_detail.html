@@ -9,19 +9,48 @@
                     data-fragment-src="{% url 'tickets:student_feed' %}">
                 ← {% trans "Retour à mes requêtes" %}
             </button>
-            <h2 class="font-bold text-navy-dark">{{ ticket.problem_type.name }}</h2>
+            <h2 class="font-bold text-navy-dark">{{ ticket.subject|default:ticket.problem_type.name }}</h2>
             <p class="text-xs text-slate-500 mt-0.5">
+                N° {{ ticket.short_id }} ·
                 {% if ticket.course %}{{ ticket.course.code }} — {{ ticket.course.name }}{% else %}{% trans "Hors UE" %}{% endif %}
             </p>
         </div>
         {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
     </header>
 
+    {# ---- Étape actuelle du dossier (A4) ---- #}
+    <ol class="flex items-center gap-1" aria-label="{% trans 'Étape actuelle du dossier' %}">
+        {% for key, label in steps %}
+            <li class="flex min-w-0 flex-1 items-center gap-1">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold
+                             {% if forloop.counter0 < current_step %}bg-emerald-100 text-emerald-700
+                             {% elif forloop.counter0 == current_step %}bg-navy text-white
+                             {% else %}bg-slate-100 text-slate-400{% endif %}"
+                      {% if forloop.counter0 == current_step %}aria-current="step"{% endif %}>
+                    {% if forloop.counter0 < current_step %}✓{% else %}{{ forloop.counter }}{% endif %}
+                </span>
+                <span class="truncate text-[11px] {% if forloop.counter0 == current_step %}font-semibold text-navy-dark{% else %}text-slate-400{% endif %}">
+                    {{ label }}
+                </span>
+            </li>
+        {% endfor %}
+    </ol>
+
     <dl class="text-sm space-y-1">
+        <div class="flex justify-between gap-4">
+            <dt class="text-slate-500">{% trans "N° de suivi" %}</dt>
+            <dd class="font-medium text-navy-dark text-right">{{ ticket.short_id }}</dd>
+        </div>
         <div class="flex justify-between gap-4">
             <dt class="text-slate-500">{% trans "Enseignant" %}</dt>
             <dd class="font-medium text-navy-dark text-right">{{ ticket.teacher.full_name }}</dd>
         </div>
+        {% if service %}
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">{% trans "Service responsable" %}</dt>
+                <dd class="font-medium text-navy-dark text-right">{{ service.name }}</dd>
+            </div>
+        {% endif %}
         {% if ticket.academic_year %}
             <div class="flex justify-between gap-4">
                 <dt class="text-slate-500">{% trans "Année académique" %}</dt>
@@ -52,6 +81,20 @@
         <p class="text-sm font-semibold text-navy-dark">{% trans "Ma demande" %}</p>
         <p class="mt-1 text-sm text-slate-600 whitespace-pre-line">{{ ticket.description }}</p>
     </div>
+
+    {% if answered_fields %}
+        <div>
+            <p class="text-sm font-semibold text-navy-dark">{% trans "Informations fournies" %}</p>
+            <dl class="mt-2 text-sm space-y-1">
+                {% for item in answered_fields %}
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-slate-500">{{ item.label }}</dt>
+                        <dd class="font-medium text-navy-dark text-right">{{ item.value }}</dd>
+                    </div>
+                {% endfor %}
+            </dl>
+        </div>
+    {% endif %}
 
     {% if ticket.attachments.all %}
         <div>
@@ -96,18 +139,25 @@
         </section>
     {% endif %}
 
+    {% if ticket.status == 'RESOLVED' and ticket.resolution_note %}
+        <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-900">
+            <p class="font-semibold">{% trans "Réponse du service" %}</p>
+            <p class="mt-1 whitespace-pre-line">{{ ticket.resolution_note }}</p>
+        </div>
+    {% endif %}
+
     {% if ticket.status == 'REJECTED' and ticket.rejection_reason %}
         <div class="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-800">
             <span class="font-semibold">{% trans "Motif du rejet" %} :</span> {{ ticket.rejection_reason }}
         </div>
     {% endif %}
 
-    {# Échanges (réponses de l'étudiant, messages de l'enseignant) #}
-    {% if ticket.comments.all %}
+    {# Échanges publics uniquement (les notes internes sont filtrées serveur) #}
+    {% if comments %}
         <div>
             <p class="text-sm font-semibold text-navy-dark">{% trans "Échanges" %}</p>
             <ul class="mt-2 space-y-2">
-                {% for comment in ticket.comments.all %}
+                {% for comment in comments %}
                     <li class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
                         <div class="flex items-center justify-between gap-3">
                             <span class="font-medium text-navy-dark">{{ comment.author_label }}</span>

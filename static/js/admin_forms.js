@@ -2,7 +2,9 @@
  * admin_forms.js — formulaires de la console super-admin.
  *
  *   - #admin-import-form : upload multipart ETL → rendu des erreurs {line, message} ;
- *   - #admin-manual-form : création manuelle d'un compte (cascade faculté/département).
+ *   - #admin-manual-form : création manuelle d'un compte (cascade faculté/département) ;
+ *   - [data-title-field] : champ « Titre » affiché pour un enseignant, retiré
+ *     du DOM et de la validation pour un étudiant (bascule dynamique).
  * Toutes les réponses passent par le toaster global (UnivReq.showNotification).
  */
 (function () {
@@ -127,6 +129,63 @@
     });
   }
 
+  /* ---------------------------------------------------------------- */
+  /* Champ « Titre » conditionnel au rôle (Étudiant / Enseignant)      */
+  /* ---------------------------------------------------------------- */
+
+  // Rôles enseignants connus : « teachers » (création manuelle) et
+  // « teacher » (AdminUserForm de la console).
+  var TEACHER_ROLE_VALUES = { teacher: 1, teachers: 1 };
+
+  /**
+   * Affiche/masque le bloc `[data-title-field]` selon le rôle sélectionné :
+   *   - Étudiant → bloc retiré du flux (classe + attribut `hidden`) et
+   *     contrôle `disabled` (exclu de FormData et de la validation HTML) ;
+   *   - Enseignant → bloc ré-affiché, replacé juste après le champ Rôle,
+   *     donc avant toutes les autres informations.
+   * Idempotent (bascule unique par formulaire), branché au chargement du
+   * document comme à chaque injection de modale.
+   */
+  function wireRoleTitle(form) {
+    if (!form || form.dataset.roleTitleWired) return;
+    var titleField = form.querySelector("[data-title-field]");
+    if (!titleField) return;
+
+    var roleSelect =
+      form.querySelector("[data-role-select]") ||
+      form.querySelector('[data-field="role"] select') ||
+      form.querySelector('[name="role"]') ||
+      form.querySelector('[name="entity"]');
+    if (!roleSelect) return;
+
+    form.dataset.roleTitleWired = "1";
+    var control = titleField.querySelector("select, input");
+
+    function placeTitleAfterRole() {
+      var roleWrapper =
+        roleSelect.closest("[data-field]") || roleSelect.parentElement;
+      if (roleWrapper && titleField.previousElementSibling !== roleWrapper) {
+        roleWrapper.insertAdjacentElement("afterend", titleField);
+      }
+    }
+
+    function sync() {
+      var isTeacher =
+        TEACHER_ROLE_VALUES[(roleSelect.value || "").toLowerCase()] === 1;
+      if (isTeacher) placeTitleAfterRole();
+      titleField.classList.toggle("hidden", !isTeacher);
+      titleField.toggleAttribute("hidden", !isTeacher);
+      titleField.setAttribute("aria-hidden", isTeacher ? "false" : "true");
+      if (control) {
+        control.disabled = !isTeacher;
+        if (!isTeacher) control.value = "";
+      }
+    }
+
+    roleSelect.addEventListener("change", sync);
+    sync();
+  }
+
   function wire(root) {
     var importForm = root.querySelector("#admin-import-form");
     if (importForm && !importForm.dataset.wired) {
@@ -137,6 +196,12 @@
     if (manualForm && !manualForm.dataset.wired) {
       manualForm.dataset.wired = "1";
       handleManual(manualForm);
+    }
+    // Champ Titre conditionnel (formulaire manuel + formulaires de console).
+    if (root.querySelectorAll) {
+      root.querySelectorAll("[data-title-field]").forEach(function (field) {
+        wireRoleTitle(field.closest("form"));
+      });
     }
   }
 

@@ -69,6 +69,7 @@ class TicketCreatorTests(BaseWorkflowTests):
             create_student_ticket(
                 student_profile=self.student,
                 problem_type_id=self.problem.id,
+                subject="Objet test",
                 description="desc",
                 uploaded_files_dict={},
                 course_id=self.course.id,
@@ -80,6 +81,7 @@ class TicketCreatorTests(BaseWorkflowTests):
             create_student_ticket(
                 student_profile=self.student,
                 problem_type_id=self.problem.id,
+                subject="Objet test",
                 description="desc",
                 uploaded_files_dict={str(self.config.id): self._file()},
                 course_id=self.foreign_course.id,
@@ -89,6 +91,7 @@ class TicketCreatorTests(BaseWorkflowTests):
         ticket = create_student_ticket(
             student_profile=self.student,
             problem_type_id=self.problem.id,
+            subject="Note manquante",
             description="Ma note manque.",
             uploaded_files_dict={str(self.config.id): self._file()},
             course_id=self.course.id,
@@ -103,6 +106,7 @@ class TicketCreatorTests(BaseWorkflowTests):
             create_student_ticket(
                 student_profile=self.student,
                 problem_type_id=self.problem.id,
+                subject="Objet test",
                 description="desc",
                 uploaded_files_dict={str(self.config.id): bad},
                 course_id=self.course.id,
@@ -116,6 +120,7 @@ class StatusMachineTests(BaseWorkflowTests):
             teacher=self.teacher,
             course=self.course,
             problem_type=self.problem,
+            subject="Objet test",
             description="desc",
             status=status,
         )
@@ -151,6 +156,7 @@ class StatusEndpointPermissionTests(BaseWorkflowTests):
             teacher=self.teacher,
             course=self.course,
             problem_type=self.problem,
+            subject="Objet test",
             description="desc",
             status=Ticket.Status.PROCESSING,
         )
@@ -190,3 +196,85 @@ class StatusEndpointPermissionTests(BaseWorkflowTests):
             {"ticket_id": str(self.ticket.id), "status": "RESOLVED"},
         )
         self.assertEqual(response.status_code, 403)
+
+
+class ResolutionNoteTests(BaseWorkflowTests):
+    """Réponse visible par l'étudiant sur une validation (RESOLVED)."""
+
+    def setUp(self):
+        super().setUp()
+        self.ticket = Ticket.objects.create(
+            student=self.student,
+            teacher=self.teacher,
+            course=self.course,
+            problem_type=self.problem,
+            subject="Objet test",
+            description="desc",
+            status=Ticket.Status.PROCESSING,
+        )
+
+    def test_apply_status_stores_resolution_note(self):
+        apply_status(
+            self.ticket,
+            Ticket.Status.RESOLVED,
+            actor=self.teacher.user,
+            actor_role=TicketStatusHistory.ActorRole.TEACHER,
+            resolution_note="Attestation générée, disponible à la scolarité.",
+        )
+        self.ticket.refresh_from_db()
+        self.assertEqual(
+            self.ticket.resolution_note,
+            "Attestation générée, disponible à la scolarité.",
+        )
+        entry = self.ticket.status_history.first()
+        self.assertIn("Attestation générée", entry.note)
+
+    def test_rejection_clears_resolution_note(self):
+        self.ticket.resolution_note = "Réponse orpheline"
+        self.ticket.save(update_fields=["resolution_note"])
+        apply_status(
+            self.ticket,
+            Ticket.Status.REJECTED,
+            reason="Pièce illisible",
+            actor=self.teacher.user,
+            actor_role=TicketStatusHistory.ActorRole.TEACHER,
+        )
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.resolution_note, "")
+
+    def test_endpoint_stores_note_and_notifies_student(self):
+        self.client.force_login(self.teacher.user)
+        response = self.client.post(
+            "/tickets/ajax/status/",
+            {
+                "ticket_id": str(self.ticket.id),
+                "status": "RESOLVED",
+                "resolution_note": "Votre relevé est validé.",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.resolution_note, "Votre relevé est validé.")
+
+        # Le student lit la réponse dans son suivi.
+        self.client.force_login(self.student.user)
+        detail = self.client.get(f"/tickets/{self.ticket.id}/suivi/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "Votre relevé est validé.")
+
+    def test_student_notification_contains_resolution(self):
+        from accounts.models import Notification
+
+        self.client.force_login(self.teacher.user)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                "/tickets/ajax/status/",
+                {
+                    "ticket_id": str(self.ticket.id),
+                    "status": "RESOLVED",
+                    "resolution_note": "Dossier traité, réponse jointe.",
+                },
+            )
+        notification = Notification.objects.filter(user=self.student.user).first()
+        self.assertIsNotNone(notification)
+        self.assertIn("Dossier traité, réponse jointe.", notification.body)

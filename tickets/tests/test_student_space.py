@@ -255,6 +255,7 @@ class EnrollmentFilterTests(StudentSpaceBase):
             {
                 "problem_type_id": self.problem.id,
                 "course_id": self.other_course.id,
+                "subject": "Demande",
                 "description": "demande",
             },
         )
@@ -269,6 +270,7 @@ class AcademicYearTests(StudentSpaceBase):
             {
                 "problem_type_id": self.simple_problem.id,
                 "teacher_id": self.teacher.id,
+                "subject": "Attestation stage",
                 "description": "attestation pour stage",
                 "academic_year": "2025-2026",
             },
@@ -284,6 +286,7 @@ class AcademicYearTests(StudentSpaceBase):
             {
                 "problem_type_id": self.simple_problem.id,
                 "teacher_id": self.teacher.id,
+                "subject": "Attestation",
                 "description": "attestation",
                 "academic_year": "2025-2026-surcharge",
             },

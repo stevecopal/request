@@ -131,6 +131,7 @@ def create_student_ticket(
     teacher_id=None,
     academic_year="",
     form_data=None,
+    subject="",
 ) -> Ticket:
     """
     Crée un ticket pour l'étudiant fourni.
@@ -143,9 +144,16 @@ def create_student_ticket(
     :param teacher_id: id de l'enseignant (si le problème n'exige pas d'UE).
     :param academic_year: session académique déclarée (ex. 2025-2026).
     :param form_data: réponses aux champs dynamiques (validées côté serveur).
+    :param subject: objet court de la requête (titre affiché).
     :return: le Ticket créé.
     :raises TicketCreationError: validation échouée (aucune écriture persistée).
     """
+    subject = (subject or "").strip()
+    if not subject:
+        raise TicketCreationError(
+            _("L'objet de la requête est obligatoire."),
+            {"subject": _("Champ obligatoire.")},
+        )
     description = (description or "").strip()
     if not description:
         raise TicketCreationError(
@@ -215,6 +223,7 @@ def create_student_ticket(
         teacher=teacher,
         course=course,
         problem_type=problem_type,
+        subject=subject[:200],
         description=description,
         academic_year=(academic_year or "").strip()[:9],
         status=Ticket.Status.SENT,

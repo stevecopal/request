@@ -129,11 +129,12 @@
  * COMPOSANTS — contrat de classes (MASTER.md §5)
  * ================================================================== */
 @layer components {
-  /* --- Boutons : cible tactile ≥ 48px, feedback active:scale-95 ------ */
+  /* --- Boutons : format compact — 40px mobile / 44px desktop -------- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 min-h-12 px-6 rounded-xl
-           font-semibold text-base select-none
+    @apply inline-flex items-center justify-center gap-2 min-h-10 px-4 rounded-xl
+           font-semibold text-sm sm:text-base select-none touch-manipulation
            transition-all duration-150
+           sm:min-h-11 sm:px-5
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy
            focus-visible:ring-offset-2
            disabled:opacity-50 disabled:pointer-events-none;
@@ -157,9 +158,10 @@
     @apply w-auto;
   }
 
-  /* --- Champs de saisie : focus discret (bordure + halo léger) ------- */
+  /* --- Champs de saisie : 40px mobile / 44px desktop, focus discret -- */
   .field {
-    @apply w-full min-h-12 px-4 rounded-xl border border-slate-200 bg-white
+    @apply w-full min-h-10 px-3 sm:min-h-11 sm:px-3.5 rounded-xl border
+           border-slate-200 bg-white text-[16px]
            text-navy-dark placeholder:text-slate-400 transition-colors
            focus:outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy/15;
   }
@@ -167,10 +169,10 @@
     @apply border-red-600 ring-2 ring-red-600/30;
   }
   .label {
-    @apply block text-sm font-medium text-navy-dark mb-1.5;
+    @apply block text-[13px] sm:text-sm font-medium text-navy-dark mb-1 sm:mb-1.5;
   }
   .helper {
-    @apply mt-1.5 text-xs text-slate-500;
+    @apply mt-0.5 text-xs text-slate-500 sm:mt-1;
   }
 
   /* --- Carte générique : surface blanche, coins larges, survol ------- */
@@ -495,5 +497,119 @@
   }
   .meter__fill {
     @apply h-full rounded-full bg-navy transition-all duration-500;
+  }
+
+  /* ================================================================== *
+   * MODALE MAÎTRESSE — robustesse mobile (clavier, débordements)
+   * ================================================================== */
+
+  /* Aucun contenu ne doit déborder horizontalement du corps de la modale. */
+  #modal-body {
+    overflow-x: hidden;
+    scroll-padding-block: 0.75rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  #modal-body form,
+  #modal-body [data-field],
+  #modal-body select,
+  #modal-body input,
+  #modal-body textarea {
+    min-width: 0;
+  }
+  #modal-body input,
+  #modal-body select,
+  #modal-body textarea {
+    max-width: 100%;
+  }
+  /* Le nom du fichier choisi peut être très long : jamais d'élargissement. */
+  #modal-body input[type="file"] {
+    max-width: 100%;
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 639.98px) {
+    /* Bottom sheet : hauteur dynamique — svh en repli, dvh privilégié
+       (s'adapte à la barre d'URL mobile et à l'ouverture du clavier). */
+    #master-modal-panel {
+      max-height: 84svh;
+    }
+    @supports (height: 1dvh) {
+      #master-modal-panel {
+        max-height: 84dvh;
+      }
+    }
+
+    /* Formulaire compact : paddings et rythme vertical réduits. */
+    #modal-body {
+      padding: 0.75rem;
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+    #modal-body form > * + * {
+      margin-top: 0.625rem;
+    }
+    #modal-body .label {
+      margin-bottom: 0.125rem;
+      font-size: 0.78125rem;
+    }
+    #modal-body .helper {
+      margin-top: 0.125rem;
+    }
+    /* Grilles de champs (2 colonnes desktop) compactées sur mobile. */
+    #modal-body .grid {
+      gap: 0.5rem;
+    }
+
+    /* Le champ actif doit déborder nettement au-dessus du clavier quand
+       `scrollIntoView` le ramène : marge de7rem réservée. */
+    #modal-body input,
+    #modal-body select,
+    #modal-body textarea,
+    #modal-body form > .btn:last-child,
+    .auth-page input,
+    .auth-page select,
+    .auth-page textarea {
+      scroll-margin-block: 7rem;
+    }
+
+    /* L'action principale reste au-dessus du clavier mobile, sans avoir
+       à faire défiler le formulaire pour la retrouver. */
+    #modal-body form > .btn:last-child {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      margin-top: 0.25rem;
+      box-shadow: 0 10px 24px -12px rgba(15, 23, 42, 0.45);
+    }
+
+    /* Clavier ouvert : la poignée disparaît pour rendre de la hauteur. */
+    #master-modal.is-keyboard-open .modal-sheet-handle {
+      display: none;
+    }
+    #master-modal.is-keyboard-open #master-modal-panel > div:first-child {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+  }
+
+  /* --- Page plein écran : 100vh en repli, 100dvh quand supporté ----- */
+  .full-viewport {
+    min-height: 100vh;
+  }
+  @supports (min-height: 100dvh) {
+    .full-viewport {
+      min-height: 100dvh;
+    }
+  }
+
+  /* --- Bascule des filtres : cible tactile fiable -------------------- */
+  [data-filter-toggle] {
+    touch-action: manipulation;
+  }
+  /* Les clics sur l'icône ciblent toujours le bouton (Safari/Android). */
+  [data-filter-toggle] svg {
+    pointer-events: none;
+  }
+  [data-filter-toggle].is-active {
+    @apply border-navy-200 bg-navy-50 text-navy;
   }
 }

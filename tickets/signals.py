@@ -54,6 +54,11 @@ def _push_notification(user_id, title, body, tag):
 def _notification_text(instance, created):
     """(titre, corps) adaptés au destinataire et à l'événement."""
     problem_type = instance.problem_type
+    # Titre explicite posé par la vue (ex. « Réponse de l'étudiant »,
+    # « Nouvelle affectation ») — prioritaire sur le libellé générique.
+    override = getattr(instance, "_notification_title", None)
+    if override:
+        return str(override), f"{problem_type} — {instance.status_label}"
     if created:
         return (
             str(_("Nouvelle requête")),
@@ -65,6 +70,13 @@ def _notification_text(instance, created):
         title = str(_("Requête rejetée"))
     elif instance.status == Ticket.Status.RESOLVED:
         title = str(_("Requête résolue"))
+        # La réponse rédigée par l'enseignant est embarquée dans la
+        # notification : l'étudiant lit la solution sans ouvrir le dossier.
+        answer = (instance.resolution_note or "").strip()
+        if answer:
+            if len(answer) > 160:
+                answer = answer[:157] + "…"
+            return title, f"{problem_type} — {answer}"
     else:
         title = str(_("Statut mis à jour"))
     return title, f"{problem_type} — {instance.status_label}"
@@ -91,7 +103,20 @@ def ticket_post_save(sender, instance, created, **kwargs):
     def _emit():
         from accounts.models import Notification
 
-        recipients = {student_user_id, teacher_user_id} - {actor_user_id}
+        # Les membres actifs du service destinataire voient aussi le dossier
+        # (transmission B6) : ils reçoivent les mêmes événements.
+        service_user_ids = set()
+        if instance.assigned_service_id:
+            from core_scolarite.models import ServiceAssignment
+
+            service_user_ids = set(
+                ServiceAssignment.objects.filter(
+                    service_id=instance.assigned_service_id, is_active=True
+                ).values_list("user_id", flat=True)
+            )
+
+        audience = {student_user_id, teacher_user_id} | service_user_ids
+        recipients = audience - {actor_user_id}
         if recipients:
             title, body = _notification_text(instance, created)
             Notification.objects.bulk_create(
@@ -106,14 +131,12 @@ def ticket_post_save(sender, instance, created, **kwargs):
                 ]
             )
 
-        for user_id in {student_user_id, teacher_user_id}:
+        for user_id in audience:
             _broadcast(user_id, payload)
         # Notification push hors-page (best-effort, jamais bloquante).
-        verb = _("Nouvelle requête") if created else _("Statut mis à jour")
-        title = str(verb)
-        body = f"{instance.problem_type} — {payload['status_label']}"
+        title, body = _notification_text(instance, created)
         tag = f"ticket-{instance.id}"
-        for user_id in {student_user_id, teacher_user_id}:
+        for user_id in recipients:
             _push_notification(user_id, title, body, tag)
 
     transaction.on_commit(_emit)

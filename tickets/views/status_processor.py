@@ -28,6 +28,7 @@ def update_status(request):
     new_status = request.POST.get("status")
     reason = request.POST.get("rejection_reason")
     more_info_request = request.POST.get("more_info_request")
+    resolution_note = request.POST.get("resolution_note")
 
     if not ticket_id or not new_status:
         return JsonResponse(
@@ -69,6 +70,7 @@ def update_status(request):
             actor_role=TicketStatusHistory.ActorRole.TEACHER,
             note=(reason or "").strip(),
             more_info_request=more_info_request,
+            resolution_note=resolution_note,
         )
     except StatusTransitionError as exc:
         return JsonResponse(

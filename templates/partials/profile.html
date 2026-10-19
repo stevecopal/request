@@ -28,6 +28,16 @@
         </h3>
 
         <dl class="mt-3 text-sm space-y-2">
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">{% trans "Identifiant" %}</dt>
+                <dd class="font-semibold text-navy-dark">{{ request.user.username }}</dd>
+            </div>
+            {% if request.user.email %}
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "E-mail" %}</dt>
+                    <dd class="font-semibold text-navy-dark text-right">{{ request.user.email }}</dd>
+                </div>
+            {% endif %}
             {% if role == 'student' and student %}
                 <div class="flex justify-between gap-4">
                     <dt class="text-slate-500">{% trans "Matricule" %}</dt>
@@ -47,6 +57,10 @@
                     <dd class="font-semibold text-navy-dark">{{ teacher.get_title_display }}</dd>
                 </div>
                 <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Université" %}</dt>
+                    <dd class="font-semibold text-navy-dark text-right">{{ teacher.university.name }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
                     <dt class="text-slate-500">{% trans "Faculté" %}</dt>
                     <dd class="font-semibold text-navy-dark text-right">{{ teacher.faculty.name }}</dd>
                 </div>
@@ -54,19 +68,74 @@
                     <dt class="text-slate-500">{% trans "Département" %}</dt>
                     <dd class="font-semibold text-navy-dark text-right">{{ teacher.department.name }}</dd>
                 </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">{% trans "Email" %}</dt>
+                    <dd class="font-semibold text-navy-dark text-right break-all">{{ request.user.email|default:"—" }}</dd>
+                </div>
             {% elif role == 'admin' %}
                 <p class="text-slate-600">{% trans "Accès complet au pilotage de la plateforme." %}</p>
             {% endif %}
         </dl>
+
+        {% if role == 'teacher' %}
+            {# B9 — Rattachements professionnels : cours et services. #}
+            <div class="mt-5 border-t border-slate-100 pt-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    {% trans "Rattachements" %}
+                </h4>
+                <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <p class="text-sm font-semibold text-navy-dark">{% trans "Cours" %}</p>
+                        {% if teacher_courses %}
+                            <ul class="mt-2 space-y-1.5">
+                                {% for course in teacher_courses %}
+                                    <li class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                                        <span class="font-semibold text-navy-dark">{{ course.code }}</span>
+                                        — {{ course.name }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="mt-1 text-sm text-slate-500">{% trans "Aucun cours rattaché." %}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-navy-dark">{% trans "Services" %}</p>
+                        {% if teacher_services %}
+                            <ul class="mt-2 space-y-1.5">
+                                {% for assignment in teacher_services %}
+                                    <li class="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                                        <span class="font-semibold text-navy-dark">{{ assignment.service.name }}</span>
+                                        <span class="text-xs text-slate-500">{{ assignment.get_role_display }}</span>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="mt-1 text-sm text-slate-500">{% trans "Aucun service rattaché." %}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
     </section>
 
-    {# Sécurité : la gestion des identifiants est centralisée (§9.2). #}
-    <aside class="rounded-2xl bg-amber-50 border border-amber-200 p-4 flex gap-3">
-        <span class="text-xl" aria-hidden="true">🔒</span>
-        <p class="text-sm text-amber-900 leading-relaxed">
-            {% blocktrans %}La gestion des identifiants est centralisée. Pour modifier vos accès, veuillez vous rendre sur le portail informatique de l'université.{% endblocktrans %}
-        </p>
-    </aside>
+    {# Sécurité : changement de mot de passe local (A6) + identifiants centraux. #}
+    <section class="card p-5 space-y-3">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500">
+            {% trans "Sécurité" %}
+        </h3>
+        <button type="button" class="btn btn-ghost w-full"
+                data-modal-src="{% url 'accounts:change_password_modal' %}"
+                data-modal-title="{% trans 'Changer mon mot de passe' %}">
+            {% trans "Changer mon mot de passe" %}
+        </button>
+        <aside class="rounded-2xl bg-amber-50 border border-amber-200 p-4 flex gap-3">
+            <span class="text-xl" aria-hidden="true">🔒</span>
+            <p class="text-sm text-amber-900 leading-relaxed">
+                {% blocktrans %}Les autres identifiants et accès universitaires restent gérés par le portail informatique de l'université.{% endblocktrans %}
+            </p>
+        </aside>
+    </section>
 
     <button type="button" class="btn btn-ghost" data-logout
             data-logout-url="{% url 'accounts:logout' %}">

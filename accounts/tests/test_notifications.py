@@ -40,6 +40,7 @@ class NotificationCreationTests(TestCase):
         return create_student_ticket(
             student_profile=self.student,
             problem_type_id=self.problem.id,
+            subject="Attestation",
             description="attestation",
             uploaded_files_dict={},
             teacher_id=self.teacher.id,

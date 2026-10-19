@@ -34,7 +34,7 @@
         {% for field in form.hidden_fields %}{{ field }}{% endfor %}
 
         {% for field in form.visible_fields %}
-            <div data-field="{{ field.name }}">
+            <div data-field="{{ field.name }}"{% if field.name == 'title' %} data-title-field{% endif %}>
                 {% if field.field.widget.input_type == "checkbox" %}
                     <label class="flex items-center gap-2.5 text-sm font-medium text-navy-dark"
                            for="{{ field.id_for_label }}">

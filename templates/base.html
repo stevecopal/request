@@ -36,13 +36,13 @@
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" data-modal-close></div>
         <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4">
             <div id="master-modal-panel"
-                 class="flex w-full max-h-[90dvh] sm:max-h-[85vh] sm:max-w-md flex-col bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl translate-y-full transition-transform duration-300 ease-out overflow-hidden">
-                <div class="relative shrink-0 border-b border-slate-100 bg-white px-5 pt-3.5 pb-3">
-                    <span class="mx-auto mb-3 block h-1.5 w-10 rounded-full bg-slate-200 sm:hidden" aria-hidden="true"></span>
+                 class="flex w-full max-h-[84svh] sm:max-h-[85vh] sm:max-w-md flex-col bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl translate-y-full transition-transform duration-300 ease-out overflow-hidden">
+                <div class="relative shrink-0 border-b border-slate-100 bg-white px-4 pt-1.5 pb-2 sm:px-5 sm:pt-3.5 sm:pb-3">
+                    <span class="modal-sheet-handle mx-auto mb-1.5 block h-1.5 w-10 rounded-full bg-slate-200 sm:hidden" aria-hidden="true"></span>
                     <div class="flex items-center justify-between gap-3">
-                        <h2 id="modal-title" class="truncate text-lg font-bold text-navy-dark">{% trans "Chargement…" %}</h2>
+                        <h2 id="modal-title" class="truncate text-[15px] font-bold text-navy-dark sm:text-lg">{% trans "Chargement…" %}</h2>
                         <button type="button"
-                                class="shrink-0 min-w-11 min-h-11 -mr-2 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-navy-dark transition-colors"
+                                class="shrink-0 min-w-10 min-h-10 -mr-1.5 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-navy-dark transition-colors"
                                 data-modal-close
                                 aria-label="{% trans "Fermer" %}">
                             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -51,7 +51,7 @@
                         </button>
                     </div>
                 </div>
-                <div id="modal-body" class="flex-1 overflow-y-auto overscroll-contain p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+                <div id="modal-body" class="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-5 sm:pb-5">
                     {# Fragment HTML injecté ici par app_spa.js #}
                 </div>
             </div>

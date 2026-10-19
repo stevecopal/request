@@ -67,6 +67,12 @@ class Ticket(UUIDModel):
         related_name="tickets",
         verbose_name=_("problem type"),
     )
+    subject = models.CharField(
+        _("objet"),
+        max_length=200,
+        blank=True,
+        help_text=_("Titre court de la requête, visible dans le suivi."),
+    )
     description = models.TextField(_("description"))
     academic_year = models.CharField(
         _("academic year"),
@@ -81,6 +87,11 @@ class Ticket(UUIDModel):
         default=Status.SENT,
     )
     rejection_reason = models.TextField(_("rejection reason"), null=True, blank=True)
+    # Réponse visible par l'étudiant lors d'une validation (RESOLVED) : le
+    # texte de solution transmis avec la décision (§A5 / §B5).
+    resolution_note = models.TextField(
+        _("réponse à l'étudiant"), blank=True, default=""
+    )
     # Demande d'informations complémentaires (enseignant → étudiant).
     complementary_info_request = models.TextField(
         _("complementary info request"), blank=True
@@ -106,6 +117,16 @@ class Ticket(UUIDModel):
     is_escalated = models.BooleanField(_("escalé"), default=False)
     escalated_at = models.DateTimeField(
         _("escalé le"), null=True, blank=True
+    )
+    # Service destinataire d'une transmission (B6) : les membres actifs du
+    # service accèdent au dossier, en plus de l'enseignant assigné.
+    assigned_service = models.ForeignKey(
+        "core_scolarite.Service",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tickets",
+        verbose_name=_("service destinataire"),
     )
 
     class Meta:
@@ -143,9 +164,20 @@ class Ticket(UUIDModel):
 
 class TicketComment(UUIDModel):
     """
-    Commentaire horodaté sur un ticket (réponse de l'étudiant à une demande
-    d'informations complémentaires, ou message de l'enseignant).
+    Commentaire horodaté sur un ticket : réponse de l'étudiant, note interne
+    d'analyse, avis, recommandation ou anomalie signalée par l'enseignant.
+
+    `is_internal=True` garantit qu'un commentaire de travail n'est **jamais**
+    exposé à l'étudiant (filtrage serveur dans les vues étudiant).
     """
+
+    class Kind(models.TextChoices):
+        STUDENT_REPLY = "student_reply", _("Réponse de l'étudiant")
+        INTERNAL_NOTE = "internal_note", _("Note interne")
+        OPINION_FAVORABLE = "opinion_favorable", _("Avis favorable")
+        OPINION_UNFAVORABLE = "opinion_unfavorable", _("Avis défavorable")
+        RECOMMENDATION = "recommendation", _("Recommandation")
+        ANOMALY = "anomaly", _("Anomalie signalée")
 
     ticket = models.ForeignKey(
         Ticket,
@@ -162,6 +194,13 @@ class TicketComment(UUIDModel):
         verbose_name=_("author"),
     )
     body = models.TextField(_("body"))
+    kind = models.CharField(
+        _("type"),
+        max_length=24,
+        choices=Kind.choices,
+        default=Kind.STUDENT_REPLY,
+    )
+    is_internal = models.BooleanField(_("interne"), default=False)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
 
     class Meta:
@@ -312,3 +351,80 @@ class TicketStatusHistory(UUIDModel):
 
     def __str__(self):
         return f"{self.ticket.short_id}: {self.from_status or '—'} → {self.to_status}"
+
+
+class TicketTransfer(UUIDModel):
+    """
+    Transmission d'un dossier (B6) vers un intervenant et/ou un service.
+
+    L'historique est immuable : on conserve l'expéditeur, le destinataire, le
+    motif et l'auteur de l'action, même si le dossier est retransmis ensuite.
+    """
+
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name="transfers",
+        verbose_name=_("ticket"),
+    )
+    from_teacher = models.ForeignKey(
+        "accounts.Teacher",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transfers_sent",
+        verbose_name=_("enseignant expéditeur"),
+    )
+    to_teacher = models.ForeignKey(
+        "accounts.Teacher",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transfers_received",
+        verbose_name=_("enseignant destinataire"),
+    )
+    to_service = models.ForeignKey(
+        "core_scolarite.Service",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transfers_received",
+        verbose_name=_("service destinataire"),
+    )
+    reason = models.TextField(_("motif de la transmission"))
+    actor = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("auteur"),
+    )
+    created_at = models.DateTimeField(_("créé le"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("transmission de ticket")
+        verbose_name_plural = _("transmissions de tickets")
+        ordering = ["created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(to_teacher__isnull=False)
+                | models.Q(to_service__isnull=False),
+                name="ticket_transfer_target_required",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["ticket", "created_at"], name="tt_ticket_created_idx"),
+        ]
+
+    @property
+    def target_label(self) -> str:
+        labels = []
+        if self.to_teacher_id:
+            labels.append(self.to_teacher.full_name)
+        if self.to_service_id:
+            labels.append(self.to_service.name)
+        return " · ".join(labels) or str(_("—"))
+
+    def __str__(self):
+        return f"{self.ticket.short_id} → {self.target_label}"

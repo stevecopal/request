@@ -50,6 +50,8 @@ def apply_status(
     actor_role: str = TicketStatusHistory.ActorRole.SYSTEM,
     note: str = "",
     more_info_request: str | None = None,
+    notification_title: str | None = None,
+    resolution_note: str | None = None,
 ) -> Ticket:
     """
     Applique une transition de statut validée et journalise l'entrée d'historique.
@@ -63,6 +65,8 @@ def apply_status(
     :param actor_role: rôle de l'acteur (student/teacher/system).
     :param note: note libre journalisée (ex. motif de rejet).
     :param more_info_request: question posée à l'étudiant (obligatoire sur MORE_INFO).
+    :param notification_title: titre explicite de la notification (ex. réponse étudiant).
+    :param resolution_note: réponse visible par l'étudiant (sur RESOLVED).
     :raises StatusTransitionError: transition invalide, instance périmée ou motif manquant.
     """
     # Re-verrouillage + relecture de la vérité terrain dans la transaction.
@@ -106,12 +110,21 @@ def apply_status(
         # La question reste consultable dans l'historique ; on l'archive à la reprise.
         locked.complementary_info_request = ""
 
+    # Réponse visible par l'étudiant sur une validation (jamais sur un rejet,
+    # qui porte déjà son motif obligatoire).
+    if new_status == Ticket.Status.RESOLVED:
+        locked.resolution_note = (resolution_note or "").strip()
+    else:
+        locked.resolution_note = ""
+
     previous_status = locked.status
     now = timezone.now()
     locked.status = new_status
     # Mémorise l'acteur pour le signal post_save (notifications) : le
     # destinataire de l'événement ne reçoit jamais sa propre action.
     locked._actor_user_id = getattr(actor, "id", None)
+    if notification_title:
+        locked._notification_title = str(notification_title)
     if new_status == Ticket.Status.RECEIVED and locked.received_at is None:
         locked.received_at = now
     if new_status in (Ticket.Status.RESOLVED, Ticket.Status.REJECTED):
@@ -121,6 +134,7 @@ def apply_status(
         update_fields=[
             "status",
             "rejection_reason",
+            "resolution_note",
             "complementary_info_request",
             "received_at",
             "resolved_at",
@@ -136,6 +150,7 @@ def apply_status(
         actor_role=actor_role,
         note=(note or "").strip()
         or (more_info_request if new_status == Ticket.Status.MORE_INFO else "")
+        or (locked.resolution_note if new_status == Ticket.Status.RESOLVED else "")
         or str(_("Statut mis à jour.")),
     )
 
@@ -143,6 +158,7 @@ def apply_status(
     for field in (
         "status",
         "rejection_reason",
+        "resolution_note",
         "complementary_info_request",
         "received_at",
         "resolved_at",
@@ -150,4 +166,6 @@ def apply_status(
     ):
         setattr(ticket, field, getattr(locked, field))
     ticket._actor_user_id = getattr(actor, "id", None)
+    if notification_title:
+        ticket._notification_title = str(notification_title)
     return ticket

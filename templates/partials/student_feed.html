@@ -22,7 +22,7 @@
             <label class="sr-only" for="feed-q">{% trans "Rechercher" %}</label>
             <input class="field !min-h-11 min-w-0" type="search" id="feed-q" name="q"
                    value="{{ query }}"
-                   placeholder="{% trans 'Rechercher (description, UE…)' %}">
+                   placeholder="{% trans 'Rechercher (n°, objet, UE…)' %}">
             <button type="submit" class="btn btn-ghost !w-auto !min-h-11 shrink-0 px-4 text-sm">
                 {% trans "OK" %}
             </button>
@@ -39,16 +39,40 @@
                 </svg>
             </button>
         </div>
-        <div id="feed-filters" class="hidden md:block">
-            <label class="sr-only" for="feed-status">{% trans "Filtrer par statut" %}</label>
-            <select class="field !min-h-11" id="feed-status" name="status" data-feed-autosubmit>
-                <option value="">{% trans "Tous les statuts" %}</option>
-                {% for value, label in status_choices %}
-                    <option value="{{ value }}" {% if active_status == value %}selected{% endif %}>
-                        {{ label }}
-                    </option>
-                {% endfor %}
-            </select>
+        <div id="feed-filters" class="hidden md:block space-y-2">
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div>
+                    <label class="sr-only" for="feed-status">{% trans "Filtrer par statut" %}</label>
+                    <select class="field !min-h-11" id="feed-status" name="status" data-feed-autosubmit>
+                        <option value="">{% trans "Tous les statuts" %}</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if active_status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="sr-only" for="feed-date-from">{% trans "Du" %}</label>
+                    <input class="field !min-h-11" type="date" id="feed-date-from" name="date_from"
+                           value="{{ date_from }}" aria-label="{% trans 'Requêtes créées à partir du' %}">
+                </div>
+                <div>
+                    <label class="sr-only" for="feed-date-to">{% trans "Au" %}</label>
+                    <input class="field !min-h-11" type="date" id="feed-date-to" name="date_to"
+                           value="{{ date_to }}" aria-label="{% trans 'Requêtes créées jusqu au' %}">
+                </div>
+            </div>
+            <div>
+                <label class="sr-only" for="feed-sort">{% trans "Trier par" %}</label>
+                <select class="field !min-h-11" id="feed-sort" name="sort" data-feed-autosubmit>
+                    {% for value, label in sort_choices %}
+                        <option value="{{ value }}" {% if sort == value %}selected{% endif %}>
+                            {% trans "Trier :" %} {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
     </form>
 
@@ -66,9 +90,10 @@
                             <span class="flex items-start justify-between gap-3">
                                 <span class="min-w-0">
                                     <span class="block font-semibold text-navy-dark truncate">
-                                        {{ ticket.problem_type.name }}
+                                        {{ ticket.subject|default:ticket.problem_type.name }}
                                     </span>
                                     <span class="block text-xs text-slate-500 mt-0.5 truncate">
+                                        N° {{ ticket.short_id }} ·
                                         {% if ticket.course %}{{ ticket.course.code }} — {{ ticket.course.name }}{% else %}{% trans "Hors UE" %}{% endif %}
                                     </span>
                                 </span>
@@ -115,7 +140,7 @@
                  aria-label="{% trans 'Pagination des requêtes' %}">
                 {% if page_obj.has_previous %}
                     <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
-                            data-fragment-src="?page={{ page_obj.previous_page_number }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if active_status %}&amp;status={{ active_status }}{% endif %}">
+                            data-fragment-src="?page={{ page_obj.previous_page_number }}{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}">
                         {% trans "Précédent" %}
                     </button>
                 {% else %}
@@ -126,7 +151,7 @@
                 </span>
                 {% if page_obj.has_next %}
                     <button type="button" class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
-                            data-fragment-src="?page={{ page_obj.next_page_number }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if active_status %}&amp;status={{ active_status }}{% endif %}">
+                            data-fragment-src="?page={{ page_obj.next_page_number }}{% if filter_qs %}&amp;{{ filter_qs }}{% endif %}">
                         {% trans "Suivant" %}
                     </button>
                 {% else %}
@@ -143,13 +168,13 @@
                 </svg>
             </span>
             <p class="mt-4 text-base font-semibold text-navy-dark">
-                {% if query or active_status %}
+                {% if query or active_status or date_from or date_to %}
                     {% trans "Aucune requête ne correspond à votre recherche." %}
                 {% else %}
                     {% trans "Aucune requête pour le moment." %}
                 {% endif %}
             </p>
-            {% if query or active_status %}
+            {% if query or active_status or date_from or date_to %}
                 <button type="button" class="btn btn-ghost !w-auto px-5 mt-4"
                         data-fragment-src="{% url 'tickets:student_feed' %}">
                     {% trans "Réinitialiser les filtres" %}

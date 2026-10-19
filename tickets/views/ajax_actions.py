@@ -6,6 +6,8 @@ Règle anti-falsification (IDOR) : l'étudiant est **toujours** lié à
 requête : impossible de créer une requête pour un autre étudiant.
 """
 
+import json
+
 from django.http import JsonResponse
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
@@ -26,15 +28,28 @@ def create_ticket(request):
             config_id = field_name[len(ATTACHMENT_PREFIX):]
             uploaded_files[config_id] = uploaded
 
+    # Réponses aux champs dynamiques : JSON sérialisé par le formulaire client.
+    form_data = {}
+    raw_form_data = (request.POST.get("form_data") or "").strip()
+    if raw_form_data:
+        try:
+            parsed = json.loads(raw_form_data)
+            if isinstance(parsed, dict):
+                form_data = parsed
+        except (ValueError, TypeError):
+            form_data = {}
+
     try:
         ticket = create_student_ticket(
             student_profile=request.student,
             problem_type_id=request.POST.get("problem_type_id"),
+            subject=request.POST.get("subject", ""),
             description=request.POST.get("description", ""),
             uploaded_files_dict=uploaded_files,
             course_id=request.POST.get("course_id") or None,
             teacher_id=request.POST.get("teacher_id") or None,
             academic_year=request.POST.get("academic_year", ""),
+            form_data=form_data,
         )
     except TicketCreationError as exc:
         return JsonResponse(
@@ -51,6 +66,7 @@ def create_ticket(request):
             "status": "success",
             "message": str(_("Requête soumise avec succès.")),
             "ticket_id": str(ticket.id),
+            "short_id": ticket.short_id,
             "status_label": ticket.status_label,
         },
         status=201,

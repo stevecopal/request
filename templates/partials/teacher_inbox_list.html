@@ -24,9 +24,17 @@ en temps réel (cible #teacher-inbox-list) sans perdre filtres/détail.
                             <span class="block text-xs text-slate-500 mt-0.5 truncate">
                                 {{ ticket.problem_type.name }}
                                 {% if ticket.course %} · {{ ticket.course.code }}{% endif %}
+                                {% if ticket.assigned_service %} · {{ ticket.assigned_service.name }}{% endif %}
                             </span>
                         </span>
-                        {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
+                        <span class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                            {% if ticket.id in overdue_ids %}
+                                <span class="badge-status bg-red-100 text-red-700">{% trans "Retard" %}</span>
+                            {% elif ticket.id in due_soon_ids %}
+                                <span class="badge-status bg-amber-100 text-amber-700">{% trans "Échéance" %}</span>
+                            {% endif %}
+                            {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
+                        </span>
                     </span>
                     <span class="block mt-2 text-xs text-slate-400">{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
                 </button>

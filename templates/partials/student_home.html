@@ -33,9 +33,10 @@
         </div>
     </section>
 
-    {# ---- Statistiques ---- #}
-    <section class="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="{% trans 'Statistiques' %}">
-        <article class="stat-card">
+    {# ---- Statistiques : cartes cliquables → flux filtré par statut ---- #}
+    <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-label="{% trans 'Statistiques' %}">
+        <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
+                data-fragment-src="{% url 'tickets:student_feed' %}">
             <span class="stat-card__icon bg-navy-50 text-navy" aria-hidden="true">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -45,11 +46,12 @@
             </span>
             <div>
                 <p class="stat-card__value">{{ stats.total }}</p>
-                <p class="stat-card__label">{% trans "Requêtes déposées" %}</p>
+                <p class="stat-card__label">{% trans "Total déposées" %}</p>
             </div>
-        </article>
+        </button>
 
-        <article class="stat-card">
+        <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
+                data-fragment-src="{% url 'tickets:student_feed' %}?status=SENT,RECEIVED">
             <span class="stat-card__icon bg-blue-50 text-blue-600" aria-hidden="true">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -57,12 +59,41 @@
                 </svg>
             </span>
             <div>
-                <p class="stat-card__value">{{ stats.open }}</p>
-                <p class="stat-card__label">{% trans "En attente / en cours" %}</p>
+                <p class="stat-card__value">{{ stats.pending }}</p>
+                <p class="stat-card__label">{% trans "En attente" %}</p>
             </div>
-        </article>
+        </button>
 
-        <article class="stat-card">
+        <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
+                data-fragment-src="{% url 'tickets:student_feed' %}?status=PROCESSING">
+            <span class="stat-card__icon bg-amber-50 text-amber-600" aria-hidden="true">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+            </span>
+            <div>
+                <p class="stat-card__value">{{ stats.processing }}</p>
+                <p class="stat-card__label">{% trans "En cours" %}</p>
+            </div>
+        </button>
+
+        <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
+                data-fragment-src="{% url 'tickets:student_feed' %}?status=MORE_INFO">
+            <span class="stat-card__icon bg-violet-50 text-violet-600" aria-hidden="true">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
+                </svg>
+            </span>
+            <div>
+                <p class="stat-card__value">{{ stats.more_info }}</p>
+                <p class="stat-card__label">{% trans "Infos demandées" %}</p>
+            </div>
+        </button>
+
+        <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
+                data-fragment-src="{% url 'tickets:student_feed' %}?status=RESOLVED">
             <span class="stat-card__icon bg-emerald-50 text-emerald-600" aria-hidden="true">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -71,11 +102,12 @@
             </span>
             <div>
                 <p class="stat-card__value">{{ stats.resolved }}</p>
-                <p class="stat-card__label">{% trans "Résolues" %}</p>
+                <p class="stat-card__label">{% trans "Acceptées" %}</p>
             </div>
-        </article>
+        </button>
 
-        <article class="stat-card">
+        <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
+                data-fragment-src="{% url 'tickets:student_feed' %}?status=REJECTED">
             <span class="stat-card__icon bg-red-50 text-red-600" aria-hidden="true">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -84,9 +116,23 @@
             </span>
             <div>
                 <p class="stat-card__value">{{ stats.rejected }}</p>
-                <p class="stat-card__label">{% trans "Rejetées" %}</p>
+                <p class="stat-card__label">{% trans "Refusées" %}</p>
             </div>
-        </article>
+        </button>
+
+        <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
+                data-fragment-src="{% url 'tickets:student_feed' %}?status=RESOLVED,REJECTED">
+            <span class="stat-card__icon bg-slate-100 text-slate-600" aria-hidden="true">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+            </span>
+            <div>
+                <p class="stat-card__value">{{ stats.closed }}</p>
+                <p class="stat-card__label">{% trans "Clôturées" %}</p>
+            </div>
+        </button>
     </section>
 
     {# ---- Activités récentes ---- #}
@@ -117,9 +163,10 @@
                                 <span class="flex items-start justify-between gap-3">
                                     <span class="min-w-0">
                                         <span class="block truncate font-semibold text-navy-dark">
-                                            {{ ticket.problem_type.name }}
+                                            {{ ticket.subject|default:ticket.problem_type.name }}
                                         </span>
                                         <span class="mt-0.5 block truncate text-xs text-slate-500">
+                                            N° {{ ticket.short_id }} ·
                                             {% if ticket.course %}{{ ticket.course.code }}{% else %}{% trans "Hors UE" %}{% endif %}
                                             · {{ ticket.created_at|date:"d/m/Y" }}
                                         </span>
@@ -147,6 +194,41 @@
                         {% trans "Vos requêtes apparaîtront ici." %}
                     </p>
                 </div>
+            {% endif %}
+        </div>
+    </section>
+
+    {# ---- Dernières notifications (A1) ---- #}
+    <section class="panel" aria-label="{% trans 'Dernières notifications' %}">
+        <div class="panel__header">
+            <h2 class="panel__title">{% trans "Dernières notifications" %}</h2>
+            <button type="button"
+                    class="inline-flex items-center gap-1 text-sm font-semibold text-navy-light hover:underline"
+                    data-fragment-src="{% url 'accounts:notifications' %}">
+                {% trans "Tout voir" %}
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+        <div class="panel__body">
+            {% if notifications %}
+                <ul class="space-y-2">
+                    {% for notification in notifications %}
+                        <li class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-semibold {% if notification.is_read %}text-slate-500{% else %}text-navy-dark{% endif %}">
+                                    {{ notification.title }}
+                                </span>
+                                <span class="mt-0.5 block truncate text-xs text-slate-500">{{ notification.body }}</span>
+                            </span>
+                            <span class="shrink-0 text-xs text-slate-400">{{ notification.created_at|date:"d/m H:i" }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="py-4 text-center text-sm text-slate-500">{% trans "Aucune notification." %}</p>
             {% endif %}
         </div>
     </section>

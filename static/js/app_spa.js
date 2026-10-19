@@ -25,6 +25,7 @@
   var lastFocusedElement = null;
   var toasterTimer = null;
   var viewportRaf = null;
+  var viewportSyncActive = false;
 
   /* ------------------------------------------------------------------ */
   /* Helpers                                                             */
@@ -96,16 +97,28 @@
    * ajustement, le bas de la modale (et les champs) passe sous le clavier.
    */
   function syncModalViewport() {
-    if (!modal) return;
+    if (!modal || modal.classList.contains("hidden")) return;
     var vv = window.visualViewport;
     if (!vv) return;
 
-    modal.style.top = vv.offsetTop + "px";
-    modal.style.height = vv.height + "px";
+    var top = Math.max(vv.offsetTop, 0);
+    var height = Math.max(vv.height, 0);
+    var isMobile = window.innerWidth < 640;
+
+    modal.style.top = top + "px";
+    modal.style.height = height + "px";
     modal.style.bottom = "auto";
 
-    if (modalPanel && window.innerWidth < 640) {
-      modalPanel.style.maxHeight = Math.max(vv.height - 12, 0) + "px";
+    // Clavier mobile : le viewport visuel est nettement plus court que la
+    // fenêtre. On compacte l'en-tête et le bouton d'action (collant, cf.
+    // input.css) reste visible au-dessus du clavier.
+    var keyboardOpen = isMobile && height < window.innerHeight - 120;
+    modal.classList.toggle("is-keyboard-open", keyboardOpen);
+
+    if (modalPanel && isMobile) {
+      modalPanel.style.maxHeight = Math.max(height - 12, 0) + "px";
+    } else if (modalPanel) {
+      modalPanel.style.maxHeight = "";
     }
   }
 
@@ -116,9 +129,9 @@
       syncModalViewport();
       // Après l'ouverture du clavier, ramener le champ actif dans la zone visible.
       var active = document.activeElement;
-      if (modalBody && active && modalBody.contains(active)) {
+      if (isFormField(active)) {
         window.setTimeout(function () {
-          keepFieldVisible(active);
+          ensureFieldVisible(active);
         }, 60);
       }
     });
@@ -126,13 +139,16 @@
 
   function startViewportSync() {
     syncModalViewport();
+    if (viewportSyncActive) return;
     var vv = window.visualViewport;
     if (!vv) return;
+    viewportSyncActive = true;
     vv.addEventListener("resize", onViewportChange);
     vv.addEventListener("scroll", onViewportChange);
   }
 
   function stopViewportSync() {
+    viewportSyncActive = false;
     var vv = window.visualViewport;
     if (vv) {
       vv.removeEventListener("resize", onViewportChange);
@@ -146,6 +162,7 @@
       modal.style.top = "";
       modal.style.height = "";
       modal.style.bottom = "";
+      modal.classList.remove("is-keyboard-open");
     }
     if (modalPanel) modalPanel.style.maxHeight = "";
   }
@@ -156,10 +173,71 @@
     var margin = 16;
     var bodyRect = modalBody.getBoundingClientRect();
     var fieldRect = field.getBoundingClientRect();
-    if (fieldRect.bottom > bodyRect.bottom - margin) {
-      modalBody.scrollTop += fieldRect.bottom - bodyRect.bottom + margin;
+
+    // Réserve la hauteur du bouton d'action collant (mobile) : le champ
+    // actif ne doit jamais se retrouver masqué derrière lui.
+    var action = modalBody.querySelector("form > .btn:last-child");
+    var bottomInset = 0;
+    if (action && action !== field && !action.classList.contains("hidden")) {
+      var actionRect = action.getBoundingClientRect();
+      if (actionRect.height) {
+        bottomInset = Math.min(actionRect.height + 12, bodyRect.height * 0.6);
+      }
+    }
+
+    var visibleBottom = bodyRect.bottom - margin - bottomInset;
+    if (fieldRect.bottom > visibleBottom) {
+      modalBody.scrollTop += fieldRect.bottom - visibleBottom;
     } else if (fieldRect.top < bodyRect.top + margin) {
       modalBody.scrollTop -= bodyRect.top - fieldRect.top + margin;
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Clavier virtuel : le champ actif reste toujours visible            */
+  /* ------------------------------------------------------------------ */
+
+  function isFormField(el) {
+    return !!el && typeof el.matches === "function" && el.matches("input, select, textarea");
+  }
+
+  /** Bas du viewport **visuel** (celui que recouvre le clavier mobile). */
+  function visualBottom() {
+    var vv = window.visualViewport;
+    return vv ? vv.offsetTop + vv.height : window.innerHeight;
+  }
+
+  function visualTop() {
+    var vv = window.visualViewport;
+    return vv ? vv.offsetTop : 0;
+  }
+
+  /**
+   * Garantit qu'un champ actif est visible au-dessus du clavier virtuel :
+   *   - dans la modale → défilement interne de #modal-body (marge réservée
+   *     pour le bouton d'action collant) ;
+   *   - hors modale (page de connexion, formulaires de fragments) →
+   *     scrollIntoView sur la fenêtre, borné au viewport visuel.
+   * Le navigateur a d'abord le droit d'agir ; on ne corrige que si le champ
+   * reste masqué (aucun défilement parasite).
+   */
+  function ensureFieldVisible(field) {
+    if (!isFormField(field)) return;
+    var margin = 24;
+    var rect = field.getBoundingClientRect();
+    if (rect.bottom <= visualBottom() - margin && rect.top >= visualTop() + 8) {
+      return;
+    }
+
+    if (modalBody && modalBody.contains(field)) {
+      keepFieldVisible(field);
+      return;
+    }
+
+    try {
+      field.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } catch (e) {
+      field.scrollIntoView(true);
     }
   }
 
@@ -375,7 +453,13 @@
   /* ------------------------------------------------------------------ */
 
   function onClick(event) {
-    var filterToggle = event.target.closest("[data-filter-toggle]");
+    // Cible robuste : sur mobile, le clic peut viser l'icône SVG ; on
+    // remonte toujours au bouton parent (icônes en pointer-events: none).
+    var target = event.target;
+    var filterToggle =
+      target && typeof target.closest === "function"
+        ? target.closest("[data-filter-toggle]")
+        : null;
     if (filterToggle) {
       event.preventDefault();
       var panelId = filterToggle.getAttribute("aria-controls");
@@ -383,6 +467,7 @@
       if (!panel) return;
       var expanded = filterToggle.getAttribute("aria-expanded") !== "true";
       filterToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+      filterToggle.classList.toggle("is-active", expanded);
       panel.classList.toggle("hidden", !expanded);
       var chevron = filterToggle.querySelector("[data-filter-chevron]");
       if (chevron) chevron.classList.toggle("rotate-180", expanded);
@@ -486,16 +571,15 @@
     document.addEventListener("keydown", onKeydown);
     window.addEventListener("popstate", onPopstate);
 
-    // Clavier mobile : garder le champ actif visible dans la modale.
-    if (modalBody) {
-      modalBody.addEventListener("focusin", function (event) {
-        var field = event.target;
-        if (!field || !field.matches || !field.matches("input, select, textarea")) return;
-        window.setTimeout(function () {
-          keepFieldVisible(field);
-        }, 280);
-      });
-    }
+    // Clavier mobile : quel que soit l'endroit du champ actif (modale ou
+    // page autonome), le ramener au-dessus du clavier après ouverture.
+    document.addEventListener("focusin", function (event) {
+      var field = event.target;
+      if (!isFormField(field)) return;
+      window.setTimeout(function () {
+        ensureFieldVisible(field);
+      }, 320);
+    });
 
     loadInitialView();
   }
