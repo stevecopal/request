@@ -25,6 +25,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from urllib.parse import urlencode
 
 from accounts.decorators import console_required, superuser_required
+from accounts.spa import spa_page
 from core_scolarite.forms import IncidentReportForm
 from core_scolarite.models import AuditLog, TechnicalEvent
 from core_scolarite.services import audit as audit_service
@@ -114,6 +115,7 @@ def _session_rows(page, viewer_id: str | None):
     return rows
 
 
+@spa_page
 @console_required(*PERMS)
 def admin_security(request):
     """Fragment C6 : journal d'audit, erreurs/incidents et sessions actives."""

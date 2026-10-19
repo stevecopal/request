@@ -11,17 +11,11 @@ from django.contrib.auth import logout as auth_logout
 from django.http import FileResponse, Http404
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
-from django.urls import reverse
+
 from accounts.decorators import login_required_json, student_required
 from accounts.models import Faculty
-from accounts.utils import (
-    ROLE_STUDENT,
-    nav_items,
-    nav_sections,
-    role_dashboard_url,
-    role_label,
-    role_name,
-)
+from accounts.spa import build_dashboard_context, spa_page
+from accounts.utils import ROLE_STUDENT, role_name
 
 
 def _prime_csrf_cookie(request):
@@ -56,36 +50,13 @@ def dashboard_shell(request):
         auth_logout(request)
         return redirect("accounts:landing")
 
-    needs_onboarding = (
-        role == ROLE_STUDENT and not request.user.student_profile.is_onboarded
+    _prime_csrf_cookie(request)
+    return render(
+        request, "dashboard/index.html", build_dashboard_context(request)
     )
 
-    _prime_csrf_cookie(request)
-    unread_notifications = 0
-    if role in (ROLE_STUDENT, "teacher"):
-        from accounts.models import Notification
 
-        unread_notifications = Notification.objects.filter(
-            user=request.user, is_read=False
-        ).count()
-    context = {
-        "role": role,
-        "role_label": role_label(role),
-        "display_name": request.user.get_full_name() or request.user.username,
-        "initials": (request.user.first_name[:1] + request.user.last_name[:1]).upper()
-        or request.user.username[:2].upper(),
-        "nav_items": nav_items(role, unread_notifications=unread_notifications),
-        "nav_sections": nav_sections(
-            role, unread_notifications=unread_notifications
-        ),
-        "unread_notifications": unread_notifications,
-        "initial_fragment": reverse(role_dashboard_url(role)),
-        "needs_onboarding": needs_onboarding,
-        "onboarding_modal": reverse("accounts:onboarding_modal"),
-    }
-    return render(request, "dashboard/index.html", context)
-
-
+@spa_page
 @login_required_json
 def profile_fragment(request):
     """Fragment du profil (bandeau « mot de passe géré par le portail central »)."""

@@ -15,9 +15,11 @@ from django.views.decorators.http import require_POST
 
 from accounts.decorators import login_required_json
 from accounts.models import Notification
+from accounts.spa import spa_page
 from accounts.utils import role_name
 
 
+@spa_page
 @login_required_json
 def notifications_fragment(request):
     """Fragment « Notifications » injecté dans #spa-viewport."""

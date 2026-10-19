@@ -32,27 +32,46 @@
                     {% blocktrans with n=audit_page.paginator.count %}{{ n }} entrée(s){% endblocktrans %}
                 </span>
             </div>
-            <form class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5"
+            <form class="mt-3"
                   data-console-filter
                   data-list-url="{% url 'core_scolarite:admin_security' %}">
-                <select name="action" class="field" aria-label="{% trans 'Action' %}">
-                    <option value="">{% trans "Toutes les actions" %}</option>
-                    {% for value, label in audit_actions %}
-                        <option value="{{ value }}" {% if active.action == value %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
-                <input type="text" name="q" class="field"
-                       placeholder="{% trans 'Acteur, entité, objet…' %}"
-                       value="{{ active.q }}">
-                <input type="date" name="date_from" class="field" aria-label="{% trans 'Du' %}"
-                       value="{{ active.date_from }}">
-                <input type="date" name="date_to" class="field" aria-label="{% trans 'Au' %}"
-                       value="{{ active.date_to }}">
-                <button type="submit" class="btn btn-ghost !min-h-11 px-4 text-sm">
-                    {% trans "Filtrer" %}
-                </button>
+                <div class="flex items-center gap-2">
+                    <input type="search" name="q" class="field min-w-0"
+                           placeholder="{% trans 'Acteur, entité, objet…' %}"
+                           value="{{ active.q }}"
+                           aria-label="{% trans 'Rechercher' %}">
+                    <button type="submit" class="btn btn-ghost !min-h-11 !w-auto shrink-0 px-4 text-sm">
+                        {% trans "Filtrer" %}
+                    </button>
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-11 !shrink-0 !px-0 text-sm md:hidden"
+                            data-filter-toggle
+                            aria-expanded="false"
+                            aria-controls="audit-filters"
+                            aria-label="{% trans 'Afficher les filtres' %}">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>
+                            <path d="M1 14h6M9 8h6M17 16h6"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="audit-filters" class="hidden md:mt-2 md:block">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <select name="action" class="field" aria-label="{% trans 'Action' %}">
+                            <option value="">{% trans "Toutes les actions" %}</option>
+                            {% for value, label in audit_actions %}
+                                <option value="{{ value }}" {% if active.action == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <input type="date" name="date_from" class="field" aria-label="{% trans 'Du' %}"
+                               value="{{ active.date_from }}">
+                        <input type="date" name="date_to" class="field" aria-label="{% trans 'Au' %}"
+                               value="{{ active.date_to }}">
+                    </div>
+                </div>
             </form>
         </div>
 
@@ -142,29 +161,50 @@
                     {% blocktrans with n=open_events %}{{ n }} non résolu(s){% endblocktrans %}
                 </span>
             </div>
-            <form class="mt-3 flex flex-wrap gap-2"
+            <form class="mt-3"
                   data-console-filter
                   data-list-url="{% url 'core_scolarite:admin_security' %}">
-                <select name="level" class="field !w-auto min-w-40" aria-label="{% trans 'Niveau' %}">
-                    <option value="">{% trans "Tous les niveaux" %}</option>
-                    {% for value, label in levels %}
-                        <option value="{{ value }}" {% if active.level == value %}selected{% endif %}>
-                            {{ label }}
+                <div class="md:hidden">
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-auto px-3 text-sm"
+                            data-filter-toggle
+                            aria-expanded="false"
+                            aria-controls="incident-filters">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>
+                            <path d="M1 14h6M9 8h6M17 16h6"/>
+                        </svg>
+                        {% trans "Filtres" %}
+                        <svg class="h-4 w-4 transition-transform" data-filter-chevron viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="incident-filters" class="hidden gap-2 md:flex md:flex-wrap">
+                    <select name="level" class="field !w-auto min-w-40" aria-label="{% trans 'Niveau' %}">
+                        <option value="">{% trans "Tous les niveaux" %}</option>
+                        {% for value, label in levels %}
+                            <option value="{{ value }}" {% if active.level == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <select name="state" class="field !w-auto min-w-40" aria-label="{% trans 'État' %}">
+                        <option value="">{% trans "Tous les états" %}</option>
+                        <option value="open" {% if active.state == "open" %}selected{% endif %}>
+                            {% trans "Non résolus" %}
                         </option>
-                    {% endfor %}
-                </select>
-                <select name="state" class="field !w-auto min-w-40" aria-label="{% trans 'État' %}">
-                    <option value="">{% trans "Tous les états" %}</option>
-                    <option value="open" {% if active.state == "open" %}selected{% endif %}>
-                        {% trans "Non résolus" %}
-                    </option>
-                    <option value="resolved" {% if active.state == "resolved" %}selected{% endif %}>
-                        {% trans "Résolus" %}
-                    </option>
-                </select>
-                <button type="submit" class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm">
-                    {% trans "Filtrer" %}
-                </button>
+                        <option value="resolved" {% if active.state == "resolved" %}selected{% endif %}>
+                            {% trans "Résolus" %}
+                        </option>
+                    </select>
+                    <button type="submit" class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm">
+                        {% trans "Filtrer" %}
+                    </button>
+                </div>
             </form>
         </div>
 
@@ -212,12 +252,18 @@
                         </div>
                         {% if not event.is_resolved %}
                             <button type="button"
-                                    class="btn btn-ghost !min-h-11 !w-auto shrink-0 px-3 text-sm"
+                                    class="btn btn-ghost !min-h-11 !w-11 !shrink-0 !px-0 sm:!w-auto sm:!px-3 text-sm"
                                     data-console-action
                                     data-action-url="{% url 'core_scolarite:admin_security_event_resolve' %}"
                                     data-pk="{{ event.pk }}"
+                                    aria-label="{% trans 'Marquer résolu' %}"
+                                    title="{% trans 'Marquer résolu' %}"
                                     data-confirm="{% trans 'Marquer cet incident comme résolu' %} ?">
-                                {% trans "Marquer résolu" %}
+                                <svg class="h-5 w-5 sm:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
+                                </svg>
+                                <span class="hidden sm:inline">{% trans "Marquer résolu" %}</span>
                             </button>
                         {% endif %}
                     </div>
@@ -286,12 +332,17 @@
                     </div>
                     {% if can_revoke %}
                         <button type="button"
-                                class="btn btn-danger !min-h-11 !w-auto shrink-0 px-3 text-sm"
+                                class="btn btn-danger !min-h-11 !w-11 !shrink-0 !px-0 sm:!w-auto sm:!px-3 text-sm"
                                 data-console-action
                                 data-action-url="{% url 'core_scolarite:admin_security_session_revoke' %}"
                                 data-session-key="{{ row.session.session_key }}"
+                                aria-label="{% trans 'Révoquer la session' %}"
                                 {% if row.is_self %}disabled title="{% trans 'Impossible de révoquer votre propre session.' %}"{% else %}data-confirm="{% trans 'Révoquer la session de' %} {{ row.username }} ?"{% endif %}>
-                            {% trans "Révoquer" %}
+                            <svg class="h-5 w-5 sm:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>
+                            </svg>
+                            <span class="hidden sm:inline">{% trans "Révoquer" %}</span>
                         </button>
                     {% endif %}
                 </li>

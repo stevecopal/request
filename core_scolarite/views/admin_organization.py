@@ -22,6 +22,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.decorators import console_required
 from accounts.models import Department, Faculty, Program
+from accounts.spa import spa_page
 from core_scolarite.forms import (
     CourseAssignmentForm,
     DepartmentForm,
@@ -183,6 +184,7 @@ def _rows(kind: str, university) -> list[dict]:
     return rows
 
 
+@spa_page
 @console_required(*PERMS)
 def admin_organization(request):
     """Fragment C2 : navigation par onglets + liste du kind courant."""

@@ -16,6 +16,7 @@ from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
 
 from accounts.decorators import superuser_required
+from accounts.spa import spa_page
 from accounts.utils import ROLE_ADMIN, nav_sections
 from core_scolarite.services import metrics as metrics_service
 from core_scolarite.services.reports import build_stats, tickets_queryset
@@ -30,6 +31,7 @@ OPEN_STATUSES = [
 ]
 
 
+@spa_page
 @superuser_required
 def admin_analytics(request):
     """Fragment du tableau de bord analytique (super-admin uniquement)."""

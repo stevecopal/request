@@ -78,6 +78,17 @@
     });
   }
 
+  /** Le détail est sous la liste sur mobile : l'amener dans la vue après clic. */
+  function revealDetail(element) {
+    element.classList.remove("hidden");
+    markSelectedRow();
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.setTimeout(function () {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 60);
+    }
+  }
+
   /** (Re)charge la fiche de la requête sélectionnée (si panneau présent). */
   function loadSelectedDetail() {
     if (!selectedTicket) return;
@@ -90,10 +101,7 @@
         target: "#admin-request-detail",
         pushState: false,
         keepScroll: true,
-        onLoaded: function (element) {
-          element.classList.remove("hidden");
-          markSelectedRow();
-        },
+        onLoaded: revealDetail,
       }
     );
   }
@@ -327,11 +335,24 @@
       target: "#admin-request-detail",
       pushState: false,
       keepScroll: true,
-      onLoaded: function (element) {
-        element.classList.remove("hidden");
-        markSelectedRow();
-      },
+      onLoaded: revealDetail,
     });
+  }
+
+  /** Retour à la liste (mobile) : referme la fiche détachée du bas de page. */
+  function onDetailClose(event) {
+    var button = event.target.closest("[data-detail-close]");
+    if (!button) return;
+    event.preventDefault();
+    selectedTicket = null;
+    var target = findDetailTarget();
+    if (target) {
+      target.classList.add("hidden");
+      target.innerHTML = "";
+    }
+    markSelectedRow();
+    var list = document.getElementById("admin-request-list");
+    if (list) list.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   /* ---------------------------------------------------------------- */
@@ -383,6 +404,7 @@
   });
   document.addEventListener("click", onActionClick);
   document.addEventListener("click", onTicketClick);
+  document.addEventListener("click", onDetailClose);
   document.addEventListener("change", onChange);
 
   // Fragments injectés dans #spa-viewport — on chaîne les hooks existants.
@@ -390,6 +412,9 @@
     return function (body) {
       if (typeof previous === "function") previous(body);
       wire(body);
+      // Ne pas recharger la fiche depuis son propre conteneur : cela
+      // relancerait un fetch à chaque injection (boucle infinie).
+      if (body && body.id === "admin-request-detail") return;
       // Après rechargement (pagination, filtre…) : la fiche reste affichée.
       loadSelectedDetail();
     };

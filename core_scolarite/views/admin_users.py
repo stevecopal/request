@@ -26,6 +26,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.decorators import console_required, superuser_required
 from accounts.models import Faculty
+from accounts.spa import spa_page
 from core_scolarite.forms import ROLE_ADMIN, ROLE_CHOICES, ROLE_NONE, ROLE_STUDENT, ROLE_TEACHER, AdminUserForm
 from core_scolarite.services import audit as audit_service
 from core_scolarite.services.credentials import issue_one_time_password
@@ -120,6 +121,7 @@ def users_queryset(request, university=None):
     return qs.distinct()
 
 
+@spa_page
 @console_required(*PERMS)
 def admin_users(request):
     """Fragment C1 : liste des comptes avec filtres et actions."""

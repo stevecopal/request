@@ -23,6 +23,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import student_required
+from accounts.spa import spa_page
 from accounts.models import Notification
 from tickets.models import Ticket, TicketComment, TicketStatusHistory
 from tickets.services.status_machine import StatusTransitionError, apply_status
@@ -36,6 +37,7 @@ OPEN_STATUSES = (
 )
 
 
+@spa_page
 @student_required
 def student_home(request):
     """Tableau de bord étudiant : stats, dernières activités, notifications."""
@@ -61,6 +63,7 @@ def student_home(request):
     )
 
 
+@spa_page
 @student_required
 def student_feed(request):
     """Fragment « Mes requêtes » : recherche `q`, filtre `status`, `page`."""
@@ -99,6 +102,7 @@ def student_feed(request):
     )
 
 
+@spa_page
 @student_required
 def student_ticket_detail(request, pk):
     """Suivi d'une requête appartenant à l'étudiant connecté (sinon 404)."""

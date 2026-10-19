@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST
 
 from accounts.decorators import console_required
 from accounts.models import Faculty, Teacher
+from accounts.spa import spa_page
 from core_scolarite.forms import AdminRequestFilterForm
 from core_scolarite.services import audit as audit_service
 from core_scolarite.services import metrics as metrics_service
@@ -118,6 +119,7 @@ def _filter_context(request, university, bound_form=None):
     }
 
 
+@spa_page
 @console_required(*READ_PERMS)
 def admin_requests(request):
     """Fragment C3 : filtres, liste paginée et zone de détail."""

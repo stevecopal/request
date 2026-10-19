@@ -22,22 +22,35 @@
         </div>
     </section>
 
-    {# ---- Filtres ---- #}
-    <form class="card space-y-3 p-4"
+    {# ---- Filtres (repliés en dropdown sur mobile) ---- #}
+    <form class="card space-y-3 p-3 sm:p-4"
           data-console-filter
           data-list-url="{% url 'core_scolarite:admin_requests' %}">
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2">
             <label class="sr-only" for="req-q">{% trans "Rechercher" %}</label>
             <input type="search"
                    id="req-q"
                    name="q"
-                   class="field"
+                   class="field min-w-0"
                    value="{{ filter_form.q.value|default_if_none:'' }}"
                    placeholder="{% trans 'Étudiant, matricule, catégorie, cours…' %}">
-            <button type="submit" class="btn btn-primary !w-auto !px-5 shrink-0">
+            <button type="submit" class="btn btn-primary !w-auto !min-h-11 shrink-0 px-4 text-sm">
                 {% trans "Filtrer" %}
             </button>
+            <button type="button"
+                    class="btn btn-ghost !min-h-11 !w-11 !shrink-0 !px-0 text-sm md:hidden"
+                    data-filter-toggle
+                    aria-expanded="false"
+                    aria-controls="requests-filters"
+                    aria-label="{% trans 'Afficher les filtres' %}">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>
+                    <path d="M1 14h6M9 8h6M17 16h6"/>
+                </svg>
+            </button>
         </div>
+        <div id="requests-filters" class="hidden md:block">
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
                 <label class="label" for="req-status">{% trans "Statut" %}</label>
@@ -101,16 +114,17 @@
         </div>
         {% if has_filters %}
             <button type="button"
-                    class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                    class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm mt-3"
                     data-fragment-src="{% url 'core_scolarite:admin_requests' %}">
                 {% trans "Réinitialiser les filtres" %}
             </button>
         {% endif %}
+        </div>
     </form>
 
     {# ---- Liste + détail ---- #}
     <div class="grid items-start gap-6 lg:grid-cols-5">
-        <div class="lg:col-span-2"
+        <div class="lg:col-span-2 scroll-mt-20"
              id="admin-request-list"
              data-list-url="{% url 'core_scolarite:admin_requests_list' %}"
              data-active-qs="{{ active_qs }}"
@@ -119,7 +133,7 @@
         </div>
 
         <section id="admin-request-detail"
-                 class="hidden lg:block lg:col-span-3 lg:sticky lg:top-20"
+                 class="hidden scroll-mt-20 lg:block lg:col-span-3 lg:sticky lg:top-20"
                  aria-live="polite">
             <div class="card p-8 text-center text-slate-500">
                 <svg class="mx-auto h-10 w-10 text-navy-200" viewBox="0 0 24 24" fill="none"

@@ -19,6 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET
 
 from accounts.decorators import console_required
+from accounts.spa import spa_page
 from core_scolarite.services import reports as reports_service
 from core_scolarite.services.scoping import resolve_university
 
@@ -35,6 +36,7 @@ KIND_LABELS = {
 }
 
 
+@spa_page
 @console_required(*PERMS)
 def admin_reports(request):
     """Fragment C5 : filtres, KPI, répartitions et exports."""

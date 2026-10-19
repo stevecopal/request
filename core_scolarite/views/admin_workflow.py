@@ -26,6 +26,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.decorators import console_required
+from accounts.spa import spa_page
 from core_scolarite.forms import (
     AttachmentConfigConsoleForm,
     ConditionalRuleConsoleForm,
@@ -313,6 +314,7 @@ TAB_KINDS = {
 }
 
 
+@spa_page
 @console_required(*PERMS)
 def admin_workflow(request):
     """Fragment C4 : onglets de configuration + liste du kind courant."""

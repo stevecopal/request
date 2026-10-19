@@ -33,6 +33,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from accounts.decorators import login_required_json, teacher_required
+from accounts.spa import spa_page
 from accounts.models import Department, Faculty, Notification
 from core_scolarite.models import Course, ProblemType
 from tickets.models import Ticket, TicketAttachment, TicketStatusHistory
@@ -190,6 +191,7 @@ def _active_querystring(active):
     return urlencode(active)
 
 
+@spa_page
 @teacher_required
 def teacher_home(request):
     """
@@ -228,6 +230,7 @@ def _render_teacher_list(request, teacher):
     return page, active, paginator
 
 
+@spa_page
 @teacher_required
 def teacher_inbox(request):
     """
@@ -337,6 +340,7 @@ def teacher_decision_modal(request):
     )
 
 
+@spa_page
 @login_required_json
 def ticket_detail(request, pk):
     """Fragment de détail d'un ticket (propriétaire ou enseignant assigné).

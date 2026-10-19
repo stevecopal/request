@@ -24,6 +24,7 @@
   var modalBody = null;
   var lastFocusedElement = null;
   var toasterTimer = null;
+  var viewportRaf = null;
 
   /* ------------------------------------------------------------------ */
   /* Helpers                                                             */
@@ -89,6 +90,79 @@
     modalBody = document.getElementById("modal-body");
   }
 
+  /**
+   * Aligne la modale sur le viewport visuel : sur mobile, le clavier virtuel
+   * réduit `visualViewport` sans redimensionner la fenêtre — sans cet
+   * ajustement, le bas de la modale (et les champs) passe sous le clavier.
+   */
+  function syncModalViewport() {
+    if (!modal) return;
+    var vv = window.visualViewport;
+    if (!vv) return;
+
+    modal.style.top = vv.offsetTop + "px";
+    modal.style.height = vv.height + "px";
+    modal.style.bottom = "auto";
+
+    if (modalPanel && window.innerWidth < 640) {
+      modalPanel.style.maxHeight = Math.max(vv.height - 12, 0) + "px";
+    }
+  }
+
+  function onViewportChange() {
+    if (viewportRaf) window.cancelAnimationFrame(viewportRaf);
+    viewportRaf = window.requestAnimationFrame(function () {
+      viewportRaf = null;
+      syncModalViewport();
+      // Après l'ouverture du clavier, ramener le champ actif dans la zone visible.
+      var active = document.activeElement;
+      if (modalBody && active && modalBody.contains(active)) {
+        window.setTimeout(function () {
+          keepFieldVisible(active);
+        }, 60);
+      }
+    });
+  }
+
+  function startViewportSync() {
+    syncModalViewport();
+    var vv = window.visualViewport;
+    if (!vv) return;
+    vv.addEventListener("resize", onViewportChange);
+    vv.addEventListener("scroll", onViewportChange);
+  }
+
+  function stopViewportSync() {
+    var vv = window.visualViewport;
+    if (vv) {
+      vv.removeEventListener("resize", onViewportChange);
+      vv.removeEventListener("scroll", onViewportChange);
+    }
+    if (viewportRaf) {
+      window.cancelAnimationFrame(viewportRaf);
+      viewportRaf = null;
+    }
+    if (modal) {
+      modal.style.top = "";
+      modal.style.height = "";
+      modal.style.bottom = "";
+    }
+    if (modalPanel) modalPanel.style.maxHeight = "";
+  }
+
+  /** Fait défiler #modal-body juste assez pour rendre le champ visible. */
+  function keepFieldVisible(field) {
+    if (!modalBody || !field || !modalBody.contains(field)) return;
+    var margin = 16;
+    var bodyRect = modalBody.getBoundingClientRect();
+    var fieldRect = field.getBoundingClientRect();
+    if (fieldRect.bottom > bodyRect.bottom - margin) {
+      modalBody.scrollTop += fieldRect.bottom - bodyRect.bottom + margin;
+    } else if (fieldRect.top < bodyRect.top + margin) {
+      modalBody.scrollTop -= bodyRect.top - fieldRect.top + margin;
+    }
+  }
+
   function openMasterModal(title) {
     if (!modal) resolveModal();
     if (!modal) return;
@@ -103,6 +177,8 @@
       modalPanel.classList.remove("translate-y-full");
     });
 
+    startViewportSync();
+
     // Cibler le vrai bouton de fermeture (le backdrop porte aussi data-modal-close
     // mais n'est pas focalisable)
     var closeButton = modal.querySelector("button[data-modal-close]");
@@ -114,6 +190,7 @@
     modal.classList.remove("opacity-100");
     modalPanel.classList.add("translate-y-full");
     document.body.style.overflow = "";
+    stopViewportSync();
 
     window.setTimeout(function () {
       modal.classList.add("hidden");
@@ -298,6 +375,20 @@
   /* ------------------------------------------------------------------ */
 
   function onClick(event) {
+    var filterToggle = event.target.closest("[data-filter-toggle]");
+    if (filterToggle) {
+      event.preventDefault();
+      var panelId = filterToggle.getAttribute("aria-controls");
+      var panel = panelId ? document.getElementById(panelId) : null;
+      if (!panel) return;
+      var expanded = filterToggle.getAttribute("aria-expanded") !== "true";
+      filterToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+      panel.classList.toggle("hidden", !expanded);
+      var chevron = filterToggle.querySelector("[data-filter-chevron]");
+      if (chevron) chevron.classList.toggle("rotate-180", expanded);
+      return;
+    }
+
     var closeTrigger = event.target.closest("[data-modal-close]");
     if (closeTrigger) {
       event.preventDefault();
@@ -394,6 +485,18 @@
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKeydown);
     window.addEventListener("popstate", onPopstate);
+
+    // Clavier mobile : garder le champ actif visible dans la modale.
+    if (modalBody) {
+      modalBody.addEventListener("focusin", function (event) {
+        var field = event.target;
+        if (!field || !field.matches || !field.matches("input, select, textarea")) return;
+        window.setTimeout(function () {
+          keepFieldVisible(field);
+        }, 280);
+      });
+    }
+
     loadInitialView();
   }
 

@@ -9,20 +9,33 @@
         <p class="text-sm text-slate-500">{% trans "Vos requêtes assignées, prioritaires par ordre d'urgence." %}</p>
     </div>
 
-    {# ---- Recherche & filtres (soumission sans rechargement de page) ---- #}
-    <form id="inbox-filter" class="card p-4 space-y-3"
+    {# ---- Recherche & filtres (repliés en dropdown sur mobile) ---- #}
+    <form id="inbox-filter" class="card p-3 sm:p-4 space-y-3"
           data-list-url="{% url 'tickets:teacher_inbox_list' %}"
           data-inbox-url="{% url 'tickets:teacher_inbox' %}">
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2">
             <label class="sr-only" for="inbox-q">{% trans "Rechercher" %}</label>
-            <input type="search" id="inbox-q" name="q" class="field"
+            <input type="search" id="inbox-q" name="q" class="field min-w-0"
                    value="{{ active.q|default:'' }}"
                    placeholder="{% trans 'Rechercher : étudiant, matricule, UE…' %}">
-            <button type="submit" class="btn btn-primary !w-auto !px-5 shrink-0">
+            <button type="submit" class="btn btn-primary !w-auto !min-h-11 shrink-0 px-4 text-sm">
                 {% trans "Filtrer" %}
+            </button>
+            <button type="button"
+                    class="btn btn-ghost !min-h-11 !w-11 !shrink-0 !px-0 text-sm md:hidden"
+                    data-filter-toggle
+                    aria-expanded="false"
+                    aria-controls="inbox-filters"
+                    aria-label="{% trans 'Afficher les filtres' %}">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>
+                    <path d="M1 14h6M9 8h6M17 16h6"/>
+                </svg>
             </button>
         </div>
 
+        <div id="inbox-filters" class="hidden space-y-3 md:block">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
                 <label class="label" for="inbox-status">{% trans "Statut" %}</label>
@@ -99,6 +112,7 @@
                 {% trans "Réinitialiser les filtres" %}
             </button>
         {% endif %}
+        </div>
     </form>
 
     <div class="grid gap-6 lg:grid-cols-5 items-start">

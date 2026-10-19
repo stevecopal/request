@@ -94,22 +94,42 @@
                                 </p>
                             {% endif %}
                         </div>
-                        <div class="flex shrink-0 gap-2">
+                        <div class="flex shrink-0 items-center gap-2">
                             {% if tab != "member" %}
                                 <button type="button"
-                                        class="btn btn-ghost !min-h-11 !w-auto px-3 text-sm"
+                                        class="btn btn-ghost !min-h-11 !w-11 !px-0 sm:!w-auto sm:!px-3 text-sm"
                                         data-modal-src="{% url 'core_scolarite:admin_organization_modal' tab %}?pk={{ row.pk }}"
-                                        data-modal-title="{% trans 'Modifier' %} — {{ row.title }}">
-                                    {% trans "Modifier" %}
+                                        data-modal-title="{% trans 'Modifier' %} — {{ row.title }}"
+                                        aria-label="{% trans 'Modifier' %}"
+                                        title="{% trans 'Modifier' %}">
+                                    <svg class="h-5 w-5 sm:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                    </svg>
+                                    <span class="hidden sm:inline">{% trans "Modifier" %}</span>
                                 </button>
                             {% endif %}
                             <button type="button"
-                                    class="btn {% if row.is_active %}btn-danger{% else %}btn-success{% endif %} !min-h-11 !w-auto px-3 text-sm"
+                                    class="btn {% if row.is_active %}btn-danger{% else %}btn-success{% endif %} !min-h-11 !w-11 !px-0 sm:!w-auto sm:!px-3 text-sm"
                                     data-console-action
                                     data-action-url="{% url 'core_scolarite:admin_organization_toggle' tab %}"
                                     data-pk="{{ row.pk }}"
+                                    aria-label="{% if row.is_active %}{% trans 'Désactiver' %}{% else %}{% trans 'Réactiver' %}{% endif %}"
+                                    title="{% if row.is_active %}{% trans 'Désactiver' %}{% else %}{% trans 'Réactiver' %}{% endif %}"
                                     data-confirm="{% if row.is_active %}{% trans 'Désactiver' %}{% else %}{% trans 'Réactiver' %}{% endif %} — {{ row.title }} ?">
-                                {% if row.is_active %}{% trans "Désactiver" %}{% else %}{% trans "Réactiver" %}{% endif %}
+                                {% if row.is_active %}
+                                    <svg class="h-5 w-5 sm:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>
+                                    </svg>
+                                    <span class="hidden sm:inline">{% trans "Désactiver" %}</span>
+                                {% else %}
+                                    <svg class="h-5 w-5 sm:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
+                                    </svg>
+                                    <span class="hidden sm:inline">{% trans "Réactiver" %}</span>
+                                {% endif %}
                             </button>
                         </div>
                     </div>
