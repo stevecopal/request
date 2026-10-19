@@ -647,8 +647,8 @@ html {
   scroll-behavior: smooth;
   /* Jamais de padding sur <html> : il élargit la page et fait
        « bouger » les dashboards de gauche à droite sur mobile. */
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: 0.5cm;
+  padding-right: 0.5cm;
   max-width: 100%;
   overflow-x: clip;
 }
@@ -2654,20 +2654,16 @@ a:focus-visible,
   min-width: 10rem;
 }
 
-.min-w-48 {
-  min-width: 12rem;
-}
-
-.min-w-56 {
-  min-width: 14rem;
-}
-
 .max-w-2xl {
   max-width: 42rem;
 }
 
 .max-w-56 {
   max-width: 14rem;
+}
+
+.max-w-\[16rem\] {
+  max-width: 16rem;
 }
 
 .max-w-\[55\%\] {
@@ -2700,10 +2696,6 @@ a:focus-visible,
 
 .max-w-xl {
   max-width: 36rem;
-}
-
-.max-w-\[16rem\] {
-  max-width: 16rem;
 }
 
 .flex-1 {
@@ -3883,6 +3875,10 @@ a:focus-visible,
   transition-duration: 300ms;
 }
 
+.duration-150 {
+  transition-duration: 150ms;
+}
+
 .ease-out {
   transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
 }
@@ -4278,6 +4274,10 @@ a:focus-visible,
 
   .lg\:flex {
     display: flex;
+  }
+
+  .lg\:inline-flex {
+    display: inline-flex;
   }
 
   .lg\:hidden {

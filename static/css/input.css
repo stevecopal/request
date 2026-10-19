@@ -69,8 +69,8 @@
     scroll-behavior: smooth;
     /* Jamais de padding sur <html> : il élargit la page et fait
        « bouger » les dashboards de gauche à droite sur mobile. */
-    padding-left: 0;
-    padding-right: 0;
+    padding-left: 0.5cm;
+    padding-right: 0.5cm;
     max-width: 100%;
     overflow-x: clip;
   }

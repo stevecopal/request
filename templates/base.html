@@ -10,7 +10,8 @@
     <title>{% block title %}{% trans "Portail des Requêtes Universitaires" %}{% endblock %}</title>
     <link rel="icon" href="{% static 'icons/favicon.svg' %}" type="image/svg+xml">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
-    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <link rel="manifest" href="{% url 'accounts:pwa_manifest' %}">
+    <meta name="apple-mobile-web-app-title" content="UnivReq">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     {% if VAPID_PUBLIC_KEY %}<meta name="vapid-public-key" content="{{ VAPID_PUBLIC_KEY }}">{% endif %}
     <link rel="stylesheet" href="{% static 'css/output.css' %}">
@@ -88,13 +89,15 @@
     <script src="{% static 'js/webpush.js' %}"></script>
     {# Navigation publique : no-op hors landing (aucun [data-nav-toggle]). #}
     <script src="{% static 'js/public_nav.js' %}"></script>
+    {# Installation PWA : no-op hors landing (aucun [data-install-app]). #}
+    <script src="{% static 'js/pwa_install.js' %}"></script>
     <script>
+      // Enregistrement immédiat (fin du body, sans attendre « load ») :
+      // les critères d'installabilité PWA exigent un service worker actif.
       if ("serviceWorker" in navigator) {
-        window.addEventListener("load", function () {
-          navigator.serviceWorker
-            .register("{% url 'accounts:service_worker' %}", { scope: "/" })
-            .catch(function () {});
-        });
+        navigator.serviceWorker
+          .register("{% url 'accounts:service_worker' %}", { scope: "/" })
+          .catch(function () {});
       }
     </script>
     {% block extra_scripts %}{% endblock %}

@@ -1,6 +1,9 @@
 """Tests des vues accounts : connexion, cascade, onboarding, sécurité."""
 
+import json
+
 from django.contrib.auth.models import User
+from django.template.loader import render_to_string
 from django.test import TestCase
 
 from accounts.models import Department, Faculty, Student
@@ -114,3 +117,74 @@ class DashboardRoutingTests(TestCase):
     def test_anonymous_redirected_from_dashboard(self):
         response = self.client.get("/dashboard/")
         self.assertEqual(response.status_code, 302)
+
+
+class LandingDownloadButtonTests(TestCase):
+    """Bouton « Télécharger l’application » de la navigation publique."""
+
+    def test_landing_shows_install_button_desktop_and_mobile(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        # Desktop (icône + libellé, ≥ lg) + mobile (icône seule, < lg).
+        self.assertEqual(html.count("data-install-app"), 2)
+        self.assertIn("Télécharger l’application", html)
+        self.assertIn('aria-label="Télécharger l’application"', html)
+        self.assertIn("pwa_install.js", html)
+        # Version mobile : positionnée avant la bascule du menu déroulant.
+        self.assertLess(html.rfind("data-install-app"), html.find("data-nav-toggle"))
+
+    def test_mobile_install_button_restricted_to_anonymous_visitors(self):
+        user = User.objects.create_user(username="ENS001", password="x")
+        html = render_to_string("components/public_navbar.html", {"user": user})
+        # Connecté : seul le bouton desktop subsiste (mobile masqué).
+        self.assertEqual(html.count("data-install-app"), 1)
+
+
+class PwaInstallTests(TestCase):
+    """Configuration PWA : manifest installable + service worker + textes du flux."""
+
+    def test_manifest_served_at_root_with_official_mime_type(self):
+        response = self.client.get("/manifest.json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/manifest+json")
+        manifest = json.loads(b"".join(response.streaming_content))
+
+        # Critères d'installabilité Chrome/Edge : start_url en 200 direct
+        # (une redirection 302 empêchait l'émission de
+        # `beforeinstallprompt`), scope racine, affichage standalone.
+        self.assertEqual(manifest["id"], "/")
+        self.assertEqual(manifest["start_url"], "/")
+        self.assertEqual(manifest["scope"], "/")
+        self.assertEqual(manifest["display"], "standalone")
+        sizes = {icon["sizes"] for icon in manifest["icons"]}
+        self.assertIn("192x192", sizes)
+        self.assertIn("512x512", sizes)
+
+        # Le start_url répond bien 200 sans redirection pour un anonyme…
+        start = self.client.get(manifest["start_url"])
+        self.assertEqual(start.status_code, 200)
+
+    def test_landing_links_manifest_and_registers_service_worker(self):
+        html = self.client.get("/").content.decode()
+        self.assertIn('rel="manifest"', html)
+        self.assertIn("/manifest.json", html)
+        # Enregistrement immédiat du SW (fin du body) + SW servi à la racine.
+        self.assertIn("navigator.serviceWorker", html)
+        self.assertIn("/service-worker.js", html)
+
+        sw = self.client.get("/service-worker.js")
+        self.assertEqual(sw.status_code, 200)
+        self.assertEqual(sw["Service-Worker-Allowed"], "/")
+
+    def test_install_messages_carried_by_navbar_root(self):
+        html = self.client.get("/").content.decode()
+        # pwa_install.js lit les textes i18n sur [data-public-navbar].
+        for attr in (
+            "data-install-waiting=",
+            "data-install-done=",
+            "data-install-https=",
+            "data-install-fallback=",
+            "data-install-fallback-ios=",
+        ):
+            self.assertIn(attr, html)

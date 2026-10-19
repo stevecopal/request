@@ -106,6 +106,22 @@ def service_worker(request):
     return response
 
 
+def pwa_manifest(request):
+    """
+    Sert le manifest PWA avec le type MIME officiel.
+
+    Chrome exige un manifest atteignable sans redirection depuis la page
+    d'accueil ; le type `application/manifest+json` évite tout rejet selon
+    le navigateur ou la chaîne de production (reverse-proxy, CDN…).
+    """
+    path = settings.BASE_DIR / "static" / "manifest.json"
+    if not path.exists():
+        raise Http404
+    response = FileResponse(open(path, "rb"), content_type="application/manifest+json")
+    response["Cache-Control"] = "no-cache"
+    return response
+
+
 @student_required
 def onboarding_modal(request):
     """Fragment de la modale d'onboarding (cascade Faculté → Département)."""

@@ -63,6 +63,8 @@ urlpatterns = [
         ajax_actions.push_unsubscribe,
         name="push_unsubscribe",
     ),
-    # PWA : service worker servi à la racine (scope « / »)
+    # PWA : service worker à la racine (scope « / ») + manifest au
+    # type MIME officiel (critères d'installabilité Chrome/Edge/Safari).
     path("service-worker.js", base.service_worker, name="service_worker"),
+    path("manifest.json", base.pwa_manifest, name="pwa_manifest"),
 ]

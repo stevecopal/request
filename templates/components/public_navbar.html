@@ -8,7 +8,13 @@
 {# app_spa.js (href = route réelle accounts:login_page, donc lien vrai).#}
 {# ==================================================================== #}
 <header class="sticky top-0 z-40  bg-white/95 backdrop-blur"
-        data-public-navbar>
+        data-public-navbar
+        {# Textes i18n consommés par static/js/pwa_install.js. #}
+        data-install-waiting="{% trans 'Préparation de l’installation…' %}"
+        data-install-done="{% trans 'UnivReq est installée : ouvrez-la depuis votre écran d’accueil.' %}"
+        data-install-https="{% trans 'Installation automatique disponible uniquement en HTTPS.' %}"
+        data-install-fallback="{% trans 'Installation automatique indisponible : ouvrez le menu du navigateur puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».' %}"
+        data-install-fallback-ios="{% trans 'Sur iPhone/iPad : bouton Partager puis « Sur l’écran d’accueil ».' %}">
     <div class="max-w-shell mx-auto px-4 sm:px-6 lg:px-8">
 
         <div class="flex h-16 items-center gap-3">
@@ -29,12 +35,46 @@
 
             {# --- Actions (masquées sous sm : le CTA vit dans le panneau) --- #}
             <div class="ml-auto flex shrink-0 items-center gap-2">
+
+                
+                <button type="button"
+                        class="hidden min-h-12 items-center gap-2 rounded-lg px-3 text-sm
+                               font-semibold text-slate-600 transition-colors duration-150
+                               hover:text-navy lg:inline-flex"
+                        data-install-app>
+                    <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <path d="M7 10l5 5 5-5"/>
+                        <path d="M12 15V3"/>
+                    </svg>
+                    <span>{% trans "Télécharger l’application" %}</span>
+                </button>
+
                 <a href="{% url 'accounts:login_page' %}"
                    class="btn btn-primary btn-auto hidden px-5 text-sm sm:inline-flex"
                    data-modal-src="{% url 'accounts:login_page' %}"
                    data-modal-title="{% trans 'Connexion' %}">
                     {% trans "Accéder au portail" %}
                 </a>
+
+                {% if not user.is_authenticated %}
+                
+                <button type="button"
+                        class="flex min-h-12 min-w-12 items-center justify-center rounded-lg
+                               text-navy transition-colors hover:bg-navy-50 lg:hidden"
+                        data-install-app
+                        aria-label="{% trans 'Télécharger l’application' %}">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <path d="M7 10l5 5 5-5"/>
+                        <path d="M12 15V3"/>
+                    </svg>
+                </button>
+                {% endif %}
 
                 {# Bascule du panneau mobile : devient le contrôle de fermeture. #}
                 <button type="button"
