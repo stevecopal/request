@@ -36,7 +36,7 @@ class Ticket(UUIDModel):
     class Status(models.TextChoices):
         SENT = "SENT", _("Envoyé")
         RECEIVED = "RECEIVED", _("Reçu")
-        PROCESSING = "PROCESSING", _("En cours")
+        PROCESSING = "PROCESSING", _("En cours de traitement")
         MORE_INFO = "MORE_INFO", _("Infos demandées")
         RESOLVED = "RESOLVED", _("Résolu")
         REJECTED = "REJECTED", _("Rejeté")

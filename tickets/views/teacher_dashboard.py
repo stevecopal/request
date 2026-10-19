@@ -4,8 +4,8 @@ Espace enseignant — tickets (ARCHITECTURE §7.3, Prompt 14 + espace complet).
   * `teacher_home`       : tableau de bord (vue d'ensemble reçues / en attente /
     en cours / terminées, nouvelles requêtes, notifications non lues).
   * `teacher_inbox`      : boîte de réception — recherche, filtres (statut, date,
-    motif, faculté, département, cours autorisés), pagination. Les tickets SENT
-    sont acquittés automatiquement (→ RECEIVED) à l'ouverture de la boîte.
+    motif, faculté, département, cours autorisés), pagination. L'acquittement
+    (SENT → RECEIVED) est un acte explicite de l'enseignant (bouton « Reçu »).
   * `teacher_inbox_list` : fragment « liste seule » — cible de rafraîchissement
     temps réel sans perdre les filtres ni le panneau de détail.
   * `ticket_detail`      : fiche détaillée (identité académique autorisée, motif,
@@ -48,7 +48,6 @@ from tickets.models import (
     TicketStatusHistory,
     TicketTransfer,
 )
-from tickets.services.status_machine import apply_status
 
 INBOX_PAGE_SIZE = 10
 
@@ -369,19 +368,10 @@ def _render_teacher_list(request, teacher):
 def teacher_inbox(request):
     """
     Fragment « Boîte de réception » (enseignant) : filtres + liste + panneau
-    de détail. Les tickets SENT sont acquittés automatiquement (→ RECEIVED)
-    dès l'ouverture — le signal temps réel notifie l'étudiant.
+    de détail. Aucune mutation automatique : c'est l'enseignant qui acquitte
+    chaque requête (SENT → RECEIVED) avec le bouton « Reçu », puis la met en
+    charge — l'étudiant est notifié à chaque étape.
     """
-    # Acquittement automatique : SENT → RECEIVED à l'ouverture de la boîte.
-    for ticket in _teacher_scope(request.teacher).filter(status=Ticket.Status.SENT):
-        apply_status(
-            ticket,
-            Ticket.Status.RECEIVED,
-            actor=request.teacher.user,
-            actor_role=TicketStatusHistory.ActorRole.TEACHER,
-            note=str(_("Acquittement automatique à l'ouverture de la boîte.")),
-        )
-
     page, active, paginator = _render_teacher_list(request, request.teacher)
     overdue_ids, due_soon_ids = _sla_flags(
         page.object_list, request.teacher.university
@@ -404,8 +394,7 @@ def teacher_inbox_list(request):
     """
     Fragment « liste seule » de la boîte : cible de rafraîchissement temps
     réel (nouvelle requête, re-classement après décision) sans perdre les
-    filtres ni le reste de la page. Pas d'acquittement ici (déjà fait au
-    chargement du fragment complet).
+    filtres ni le reste de la page.
     """
     page, active, paginator = _render_teacher_list(request, request.teacher)
     overdue_ids, due_soon_ids = _sla_flags(
@@ -479,7 +468,7 @@ def _teacher_ticket_or_error(request, raw_id):
 
 @teacher_required
 def teacher_decision_modal(request):
-    """Fragment de la modale de décision (Valider / Rejeter / Plus d'infos).
+    """Fragment de la modale de décision (Accepter / Rejeter / Infos supplémentaires).
 
     Le droit est vérifié par `may_decide` : enseignant assigné, ou périmètre
     élargi explicitement par une règle de workflow. Un simple membre du
@@ -515,9 +504,11 @@ def ticket_detail(request, pk):
     """Fiche détaillée d'un ticket (propriétaire ou enseignant autorisé).
 
     * `is_teacher_view` : l'utilisateur est l'enseignant assigné ou un membre
-      actif du service destinataire ; il voit alors les notes internes.
-    * `can_decide` : uniquement si `may_decide` l'autorise (jamais déduit du
-      seul rôle « enseignant »).
+      actif du service destinataire.
+    * `can_decide` : uniquement si `may_decide` l'autorise (enseignant assigné
+      ou périmètre de workflow) — jamais déduit du seul rôle « enseignant ».
+      Seul `can_decide` affiche les boutons Reçu / Prise en charge / Infos /
+      Accepter / Rejeter et le transfert (réaffectation par l'enseignant).
     * côté étudiant, les commentaires internes sont filtrés côté serveur.
     """
     ticket, error = _get_accessible_ticket(request, pk)
@@ -559,17 +550,10 @@ def ticket_detail(request, pk):
             "comments": comments,
             "is_teacher_view": is_teacher_view,
             "can_decide": can_decide,
-            "can_transfer": is_teacher_view and ticket.is_open,
+            "can_transfer": can_decide and ticket.is_open,
             "more_info_enabled": settings.ENABLE_TEACHER_MORE_INFO,
             "sla": sla,
             "form_data_rows": _form_data_rows(ticket),
-            "note_kinds": [
-                (TicketComment.Kind.INTERNAL_NOTE, _("Note interne")),
-                (TicketComment.Kind.OPINION_FAVORABLE, _("Avis favorable")),
-                (TicketComment.Kind.OPINION_UNFAVORABLE, _("Avis défavorable")),
-                (TicketComment.Kind.RECOMMENDATION, _("Recommandation")),
-                (TicketComment.Kind.ANOMALY, _("Signaler une anomalie")),
-            ],
         },
     )
 
@@ -613,16 +597,22 @@ def teacher_transfer_modal(request):
 @require_POST
 @teacher_required
 def teacher_transfer(request):
-    """Transmet un dossier à un intervenant et/ou à un service, avec motif.
+    """Transmet un dossier à un autre enseignant et/ou à un service, avec motif.
 
-    Vérifications serveur : ticket accessible, motif obligatoire, au moins
-    une destination, cibles de la **même université**. Une transmission à un
-    intervenant change l'enseignant assigné ; une transmission à un service
-    ouvre le dossier aux membres actifs du service.
+    Seul l'enseignant assigné peut réaffecter (jamais l'admin) : une
+    transmission à un intervenant change l'enseignant assigné (notifié), une
+    transmission à un service ouvre le dossier à ses membres actifs.
     """
     ticket, error = _teacher_ticket_or_error(request, request.POST.get("ticket_id"))
     if error:
         return error
+    # Seul l'enseignant assigné réaffecte (jamais l'admin, jamais un service seul).
+    from core_scolarite.services.decision_rights import _is_assigned_teacher
+
+    if not _is_assigned_teacher(request.user, ticket):
+        return JsonResponse(
+            {"status": "error", "message": str(_("Action non autorisée."))}, status=403
+        )
     if not ticket.is_open:
         return JsonResponse(
             {"status": "error", "message": str(_("Ce dossier est déjà clôturé."))},
@@ -743,13 +733,28 @@ def teacher_transfer(request):
             % {"target": target_label, "reason": reason},
         )
 
-        # L'ancien enseignant garde une trace dans son centre de notifications
-        # même s'il perd l'accès au dossier après la transmission.
+        # Notifications de transmission (centre enseignant) : l'ancien garde une
+        # trace même s'il perd l'accès, le nouvel enseignant est notifié de sa
+        # nouvelle affectation, et l'étudiant suit la réaffectation de sa requête.
         if from_teacher.user_id != request.user.id:
             Notification.objects.create(
                 user=from_teacher.user,
                 ticket=locked,
                 title=str(_("Dossier transféré")),
+                body=f"{locked.problem_type} — {target_label}",
+            )
+        if to_teacher is not None and to_teacher.user_id != request.user.id:
+            Notification.objects.create(
+                user=to_teacher.user,
+                ticket=locked,
+                title=str(_("Nouvelle affectation")),
+                body=f"{locked.problem_type} — {target_label}",
+            )
+        if locked.student_id and locked.student.user_id != request.user.id:
+            Notification.objects.create(
+                user=locked.student.user,
+                ticket=locked,
+                title=str(_("Requête réaffectée")),
                 body=f"{locked.problem_type} — {target_label}",
             )
 
@@ -762,92 +767,6 @@ def teacher_transfer(request):
                 "id": str(locked.id),
                 "status": locked.status,
                 "status_label": locked.status_label,
-            },
-        }
-    )
-
-
-@require_POST
-@teacher_required
-def teacher_add_note(request):
-    """Ajoute une analyse interne : note, avis, recommandation ou anomalie.
-
-    Ces contenus sont toujours `is_internal=True` : ils ne sont jamais rendus
-    dans l'espace étudiant. Une anomalie escalade en plus le dossier pour la
-    console d'administration, sans notifier l'étudiant.
-    """
-    ticket, error = _teacher_ticket_or_error(request, request.POST.get("ticket_id"))
-    if error:
-        return error
-
-    allowed_kinds = {
-        TicketComment.Kind.INTERNAL_NOTE,
-        TicketComment.Kind.OPINION_FAVORABLE,
-        TicketComment.Kind.OPINION_UNFAVORABLE,
-        TicketComment.Kind.RECOMMENDATION,
-        TicketComment.Kind.ANOMALY,
-    }
-    kind = (request.POST.get("kind") or TicketComment.Kind.INTERNAL_NOTE).strip()
-    if kind not in allowed_kinds:
-        return JsonResponse(
-            {"status": "error", "message": str(_("Type d'analyse invalide."))},
-            status=400,
-        )
-    body = (request.POST.get("body") or "").strip()
-    if not body:
-        return JsonResponse(
-            {
-                "status": "error",
-                "message": str(_("Le contenu de l'analyse est obligatoire.")),
-                "errors": {"body": str(_("Champ obligatoire."))},
-            },
-            status=400,
-        )
-    if len(body) > 5000:
-        return JsonResponse(
-            {"status": "error", "message": str(_("Le texte est trop long (5000 caractères maximum)."))},
-            status=400,
-        )
-
-    comment = TicketComment.objects.create(
-        ticket=ticket,
-        author=request.user,
-        body=body,
-        kind=kind,
-        is_internal=True,
-    )
-
-    if kind == TicketComment.Kind.ANOMALY:
-        now = timezone.now()
-        # `update()` volontaire : pas de post_save, donc aucune notification
-        # étudiante pour une remontée interne.
-        Ticket.objects.filter(pk=ticket.pk).update(
-            is_escalated=True, escalated_at=now
-        )
-        TicketStatusHistory.objects.create(
-            ticket=ticket,
-            from_status=ticket.status,
-            to_status=ticket.status,
-            actor=request.user,
-            actor_role=TicketStatusHistory.ActorRole.TEACHER,
-            note=str(_("Anomalie signalée : %(body)s")) % {"body": body[:500]},
-        )
-
-    messages = {
-        TicketComment.Kind.INTERNAL_NOTE: _("Note interne enregistrée."),
-        TicketComment.Kind.OPINION_FAVORABLE: _("Avis favorable enregistré."),
-        TicketComment.Kind.OPINION_UNFAVORABLE: _("Avis défavorable enregistré."),
-        TicketComment.Kind.RECOMMENDATION: _("Recommandation enregistrée."),
-        TicketComment.Kind.ANOMALY: _("Anomalie signalée et dossier escaladé."),
-    }
-    return JsonResponse(
-        {
-            "status": "success",
-            "message": str(messages.get(kind, _("Analyse enregistrée."))),
-            "comment": {
-                "id": str(comment.id),
-                "kind": comment.kind,
-                "kind_label": comment.get_kind_display(),
             },
         }
     )

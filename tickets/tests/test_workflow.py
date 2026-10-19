@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from accounts.models import Department, Faculty, Student, Teacher
 from accounts.tests.factories import make_university
 from core_scolarite.models import AttachmentConfig, Course, ProblemType
-from tickets.models import Ticket
+from tickets.models import Ticket, TicketStatusHistory
 from tickets.services.status_machine import StatusTransitionError, apply_status
 from tickets.services.ticket_creator import TicketCreationError, create_student_ticket
 
@@ -173,7 +173,7 @@ class StatusEndpointPermissionTests(BaseWorkflowTests):
         self.client.force_login(self.teacher.user)
         response = self.client.post(
             "/tickets/ajax/status/",
-            {"ticket_id": str(self.ticket.id), "status": "RESOLVED"},
+            {"ticket_id": str(self.ticket.id), "status": "RESOLVED", "resolution_note": "Dossier validé."},
         )
         self.assertEqual(response.status_code, 200)
         self.ticket.refresh_from_db()
@@ -256,9 +256,12 @@ class ResolutionNoteTests(BaseWorkflowTests):
         self.ticket.refresh_from_db()
         self.assertEqual(self.ticket.resolution_note, "Votre relevé est validé.")
 
-        # Le student lit la réponse dans son suivi.
+        # Le student lit la réponse dans son suivi (fragment SPA).
         self.client.force_login(self.student.user)
-        detail = self.client.get(f"/tickets/{self.ticket.id}/suivi/")
+        detail = self.client.get(
+            f"/tickets/{self.ticket.id}/suivi/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
         self.assertEqual(detail.status_code, 200)
         self.assertContains(detail, "Votre relevé est validé.")
 

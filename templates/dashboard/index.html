@@ -12,7 +12,7 @@
 {# Mobile  (< lg) : barre latérale en tiroir (menu), pied de page simple. #}
 {# Les entrées `nav_sections` sont générées côté serveur selon le rôle.  #}
 {# ==================================================================== #}
-<div class="flex min-h-screen w-full">
+<div class="flex min-h-screen w-full overflow-x-clip">
 
     {# -------- Voile du tiroir mobile -------- #}
     <div id="app-drawer-overlay"
@@ -109,7 +109,7 @@
     </aside>
 
     {# ================= COLONNE PRINCIPALE ================= #}
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex min-w-0 max-w-full flex-1 flex-col overflow-x-clip">
 
         {# -------- En-tête : uniquement l'espace + la date -------- #}
         <header class="app-topbar">

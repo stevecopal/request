@@ -34,8 +34,17 @@
                             {% endif %}
                         </span>
                     </span>
-                    <span class="mt-2 block text-xs text-slate-400">
-                        {{ ticket.created_at|date:"d/m/Y H:i" }}
+                    <span class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                        <span>{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
+                        {% if ticket.processing %}
+                            <span class="tabular-nums {% if ticket.processing.is_done %}font-semibold text-emerald-600{% endif %}">
+                                {% if ticket.processing.is_done %}
+                                    {% trans "Traité en" %} {{ ticket.processing.duration }}
+                                {% else %}
+                                    {% trans "En cours depuis" %} {{ ticket.processing.duration }}
+                                {% endif %}
+                            </span>
+                        {% endif %}
                     </span>
                 </button>
             </li>

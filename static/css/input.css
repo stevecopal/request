@@ -67,8 +67,12 @@
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
-    padding-left: 0.5cm;
-    padding-right: 0.5cm;
+    /* Jamais de padding sur <html> : il élargit la page et fait
+       « bouger » les dashboards de gauche à droite sur mobile. */
+    padding-left: 0;
+    padding-right: 0;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   /* Coque authentifiée : la barre latérale occupe toute la largeur. */
@@ -80,6 +84,23 @@
   body {
     @apply bg-background text-navy-dark font-sans antialiased;
     overscroll-behavior-y: contain;
+    /* Verrou anti-défilement horizontal : aucun fragment ne doit élargir
+       la page (bannières, cartes, tableaux, badges). */
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  /* Médias et blocs larges : toujours contenus dans la colonne. */
+  img,
+  svg,
+  table,
+  pre,
+  video {
+    max-width: 100%;
+  }
+  table {
+    display: block;
+    overflow-x: auto;
   }
 
   /* Défilement discret (desktop) */
@@ -257,19 +278,18 @@
   }
 
   /* --- Landing : bandes sombres à fond perdu ------------------------ *
-     `html` porte un padding horizontal de 0.5cm (@layer base) : les
-     bandes pleine largeur s'arrêtaient 0.5cm des bords du viewport et
-     cassaient la transition clair → navy. Ce correctif est volontaire-
-     ment limité à la landing (section #acces + footer public).         */
+     Plus de compensation nécessaire : <html> ne porte aucun padding.   */
   .landing-bleed {
-    margin-left: -0.5cm;
-    margin-right: -0.5cm;
+    margin-left: 0;
+    margin-right: 0;
   }
 
   /* --- Carte de requête : rail de statut coloré (signature) ---------- */
   .ticket-card {
     @apply relative bg-white rounded-2xl border border-slate-100 shadow-card
            p-4 pl-5 overflow-hidden text-left transition-all duration-200;
+    min-width: 0;
+    max-width: 100%;
   }
   .ticket-card:hover {
     @apply shadow-card-hover border-navy-100;
@@ -383,9 +403,19 @@
            bg-white/95 px-4 backdrop-blur sm:px-6;
   }
 
-  /* --- Contenu ------------------------------------------------------ */
+  /* --- Contenu : colonne stable, jamais de débordement horizontal ------
+     `overflow: clip` fige le balancement gauche-droite : le tactile vertical
+     reste fluide, aucun fragment large ne déplace la page. */
   .app-content {
     @apply mx-auto w-full max-w-shell flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8;
+    min-width: 0;
+    overflow-x: clip;
+    overflow-y: visible;
+    overscroll-behavior-x: none;
+  }
+  .app-content > * {
+    min-width: 0;
+    max-width: 100%;
   }
 
   /* --- Petit pied de page ------------------------------------------ */
@@ -438,10 +468,17 @@
   }
 
   /* --- Tableaux de bord : bannière, cartes, raccourcis, panneaux --- */
-  /* Bannière claire : le blanc domine, dégradé léger vers un bleu très pâle. */
+  /* Bannière claire : le blanc domine, dégradé léger vers un bleu très pâle.
+     Colonne stable : aucun halo ne doit élargir la page sur mobile. */
   .dashboard-hero {
     @apply relative overflow-hidden rounded-2xl border border-navy-100
            bg-gradient-to-br from-white via-white to-navy-50 p-5 shadow-card sm:p-7;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  .dashboard-hero > * {
+    min-width: 0;
   }
   .dashboard-hero::before {
     content: "";
@@ -458,6 +495,9 @@
     @apply relative flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white
            p-4 shadow-card transition-all duration-200 hover:-translate-y-0.5
            hover:shadow-card-hover;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
   .stat-card__icon {
     @apply flex h-11 w-11 items-center justify-center rounded-xl;
@@ -473,6 +513,9 @@
     @apply flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4
            text-left shadow-card transition-all duration-200 hover:-translate-y-0.5
            hover:border-navy-100 hover:shadow-card-hover;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
   .quick-action__icon {
     @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
@@ -481,9 +524,12 @@
 
   .panel {
     @apply overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card;
+    min-width: 0;
+    max-width: 100%;
   }
   .panel__header {
     @apply flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4;
+    min-width: 0;
   }
   .panel__title {
     @apply text-sm font-bold text-navy-dark;

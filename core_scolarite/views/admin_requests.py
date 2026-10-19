@@ -1,47 +1,34 @@
 """
-C3 — Suivi central des requêtes (console super-admin).
+C3 — Suivi central des requêtes (console super-admin) : **consultation seule**.
 
-  GET  admin/requests/             filtres + liste + panneau de détail (fragment)
-  GET  admin/requests/list/        liste seule (rafraîchissement)
-  GET  admin/requests/detail/?ticket=…   fiche détaillée + actions
-  POST admin/requests/assign/      affectation d'un enseignant
-  POST admin/requests/status/      transition de statut (moteur de statuts)
+  GET  admin/requests/                 filtres + liste + panneau de détail
+  GET  admin/requests/list/            liste seule (rafraîchissement)
+  GET  admin/requests/detail/?ticket=… fiche détaillée (statut + temps de traitement)
 
-Droits : consultation = `tickets.view_ticket` (+ superuser), actions =
-`tickets.change_ticket`. La transition passe par `apply_status` (verrouillage
-concurrence + historique) — jamais de mise à jour SQL directe du statut.
+Droits : `tickets.view_ticket`. L'admin ne pilote **ni le statut ni
+l'affectation** : acquittement, prise en charge, demande d'informations et
+décision sont des actes de l'enseignant (espace enseignant), et la
+réaffectation passe par la transmission enseignant → enseignant/service.
 """
 
 from __future__ import annotations
 
-from django.conf import settings
 from django.db.models import Q
 from django.shortcuts import render
+from django.utils import timezone
 from django.utils.translation import gettext as _
-from django.views.decorators.http import require_POST
 
 from accounts.decorators import console_required
-from accounts.models import Faculty, Teacher
+from accounts.models import Faculty
 from accounts.spa import spa_page
 from core_scolarite.forms import AdminRequestFilterForm
-from core_scolarite.services import audit as audit_service
 from core_scolarite.services import metrics as metrics_service
 from core_scolarite.services.scoping import resolve_university
-from tickets.models import Ticket, TicketStatusHistory
-from tickets.services.status_machine import ALLOWED_TRANSITIONS, StatusTransitionError, apply_status
+from tickets.models import Ticket
 
-from .common import json_error, json_ok, paginate
+from .common import json_error, paginate
 
-READ_PERMS = ("tickets.view_ticket", "tickets.change_ticket")
-WRITE_PERMS = ("tickets.change_ticket",)
-
-STATUS_ACTION_LABELS = {
-    Ticket.Status.RECEIVED: _("Acquitter"),
-    Ticket.Status.PROCESSING: _("Prendre en charge"),
-    Ticket.Status.RESOLVED: _("Valider"),
-    Ticket.Status.REJECTED: _("Refuser"),
-    Ticket.Status.MORE_INFO: _("Demander des infos"),
-}
+READ_PERMS = ("tickets.view_ticket",)
 
 PAGE_SIZE = 25
 
@@ -119,10 +106,48 @@ def _filter_context(request, university, bound_form=None):
     }
 
 
+def _format_duration(delta):
+    """Durée humaine compacte : « 2 j 4 h », « 5 h 12 min », « 40 min »."""
+    total = max(int(delta.total_seconds()), 0)
+    days, rest = divmod(total, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes = rest // 60
+    if days:
+        return _("%(days)d j %(hours)d h") % {"days": days, "hours": hours}
+    if hours:
+        return _("%(hours)d h %(minutes)02d min") % {
+            "hours": hours,
+            "minutes": minutes,
+        }
+    return _("%(minutes)d min") % {"minutes": minutes}
+
+
+def processing_time(ticket):
+    """Temps de traitement d'une requête.
+
+    Terminée (RESOLVED/REJECTED, `resolved_at` posé) : durée réelle
+    `resolved_at - created_at`. En cours : temps écoulé depuis la soumission.
+    """
+    closed_at = ticket.resolved_at
+    end = closed_at or timezone.now()
+    return {
+        "duration": _format_duration(end - ticket.created_at),
+        "is_done": closed_at is not None,
+        "closed_at": closed_at,
+    }
+
+
+def _annotate_processing(rows):
+    """Pose `ticket.processing` sur chaque ligne de la liste (25 max)."""
+    for ticket in rows:
+        ticket.processing = processing_time(ticket)
+    return rows
+
+
 @spa_page
 @console_required(*READ_PERMS)
 def admin_requests(request):
-    """Fragment C3 : filtres, liste paginée et zone de détail."""
+    """Fragment C3 : filtres, liste paginée (statut + temps de traitement)."""
     university = resolve_university(request)
     form, context = _filter_context(request, university)
     qs = filtered_tickets(request, form, university)
@@ -130,7 +155,7 @@ def admin_requests(request):
     context.update(
         {
             "page_obj": page_obj,
-            "rows": page_obj.object_list,
+            "rows": _annotate_processing(page_obj.object_list),
             "total_filtered": qs.count(),
             "status_choices": Ticket.Status.choices,
             "overdue_thresholds": metrics_service.thresholds(None, university)[:2],
@@ -141,7 +166,7 @@ def admin_requests(request):
 
 @console_required(*READ_PERMS)
 def admin_requests_list(request):
-    """Liste seule (rafraîchissement après action, sans perdre les filtres)."""
+    """Liste seule (rafraîchissement, sans perdre les filtres)."""
     university = resolve_university(request)
     form, context = _filter_context(request, university)
     qs = filtered_tickets(request, form, university)
@@ -149,7 +174,7 @@ def admin_requests_list(request):
     context.update(
         {
             "page_obj": page_obj,
-            "rows": page_obj.object_list,
+            "rows": _annotate_processing(page_obj.object_list),
             "total_filtered": qs.count(),
             "has_filters": bool(form.active_filters()),
         }
@@ -177,40 +202,15 @@ def _load_ticket(request, university):
 
 @console_required(*READ_PERMS)
 def admin_requests_detail(request):
-    """Fiche détaillée : identité, historique, actions d'affectation/statut."""
+    """Fiche détaillée en lecture seule : identité, statut, temps de traitement."""
     university = resolve_university(request)
     ticket = _load_ticket(request, university)
     if ticket is None:
         return json_error(_("Requête introuvable."), status=404)
 
-    teachers = Teacher.objects.filter(user__is_active=True).select_related(
-        "user", "faculty"
-    )
-    if university is not None:
-        teachers = teachers.filter(faculty__university=university)
-    teachers = teachers.order_by("user__last_name", "user__first_name")
-
-    from django.conf import settings as django_settings
-
-    actions = []
-    for status in ALLOWED_TRANSITIONS.get(ticket.status, []):
-        if status == Ticket.Status.MORE_INFO and not django_settings.ENABLE_TEACHER_MORE_INFO:
-            continue
-        actions.append(
-            {
-                "status": status,
-                "label": STATUS_ACTION_LABELS.get(
-                    status, _("Passer à %s") % dict(Ticket.Status.choices).get(status, status)
-                ),
-                "needs_reason": status == Ticket.Status.REJECTED,
-                "needs_question": status == Ticket.Status.MORE_INFO,
-            }
-        )
-
     context = {
         "ticket": ticket,
-        "actions": actions,
-        "teachers": teachers,
+        "processing": processing_time(ticket),
         "history": ticket.status_history.select_related("actor").order_by("-created_at"),
         "comments": ticket.comments.select_related("author").order_by("created_at"),
         "attachments": [
@@ -227,93 +227,3 @@ def admin_requests_detail(request):
         "max_days": metrics_service.thresholds(ticket, university)[0],
     }
     return render(request, "partials/admin/request_detail.html", context)
-
-
-@require_POST
-@console_required(*WRITE_PERMS)
-def admin_requests_assign(request):
-    """Affecte (ou réaffecte) un enseignant — contrôle périmètre serveur."""
-    university = resolve_university(request)
-    ticket = _load_ticket(request, university)
-    if ticket is None:
-        return json_error(_("Requête introuvable."), status=404)
-
-    from core_scolarite.services.scoping import parse_uuid
-
-    teacher_id = parse_uuid(request.POST.get("teacher_id"))
-    if teacher_id is None:
-        return json_error(_("Enseignant manquant."))
-    teachers = Teacher.objects.select_related("faculty", "user")
-    if university is not None:
-        teachers = teachers.filter(faculty__university=university)
-    teacher = teachers.filter(pk=teacher_id).first()
-    if teacher is None:
-        return json_error(
-            _("Enseignant introuvable hors du périmètre de l'université."), status=404
-        )
-
-    previous = ticket.teacher_id
-    if previous == teacher.pk:
-        return json_ok(_("Affectation inchangée."), unchanged=True)
-
-    ticket.teacher = teacher
-    ticket.save(update_fields=["teacher", "updated_at"])
-    audit_service.record(
-        request,
-        audit_service.AuditLog.Action.UPDATE,
-        obj=ticket,
-        changes={"teacher": {"from": str(previous), "to": str(teacher.pk)}},
-        university=university,
-    )
-    return json_ok(
-        _("Requête affectée à %(name)s.")
-        % {"name": teacher.user.get_full_name() or teacher.user.username}
-    )
-
-
-@require_POST
-@console_required(*WRITE_PERMS)
-def admin_requests_status(request):
-    """Transition de statut administrative (moteur + historique + audit)."""
-    university = resolve_university(request)
-    ticket = _load_ticket(request, university)
-    if ticket is None:
-        return json_error(_("Requête introuvable."), status=404)
-
-    new_status = request.POST.get("status") or ""
-    # Une seule zone de note côté UI : motif de refus OU question selon cible.
-    note = (
-        request.POST.get("note")
-        or request.POST.get("rejection_reason")
-        or request.POST.get("more_info_request")
-        or ""
-    ).strip()
-    reason = note if new_status == Ticket.Status.REJECTED else None
-    question = note if new_status == Ticket.Status.MORE_INFO else None
-    if new_status not in dict(Ticket.Status.choices):
-        return json_error(_("Statut inconnu."))
-
-    try:
-        apply_status(
-            ticket,
-            new_status,
-            reason=reason,
-            actor=request.user,
-            actor_role=TicketStatusHistory.ActorRole.SYSTEM,
-            note=note,
-            more_info_request=question,
-        )
-    except StatusTransitionError as exc:
-        return json_error(exc.message, status=400, errors=exc.field_errors)
-
-    audit_service.record(
-        request,
-        audit_service.AuditLog.Action.TRANSITION,
-        obj=ticket,
-        changes={"status": {"to": new_status}},
-        university=university,
-    )
-    return json_ok(
-        _("Statut mis à jour : %s.") % ticket.get_status_display(),
-        status_label=ticket.status_label,
-    )

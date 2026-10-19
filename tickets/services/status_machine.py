@@ -1,11 +1,15 @@
 """
-Machine à états des tickets — tickets (ARCHITECTURE §6.4, Prompt 15).
+Machine à états des tickets — workflow enseignant ↔ étudiant.
 
-Transitions autorisées :
-  SENT → RECEIVED → PROCESSING → {RESOLVED, REJECTED}
+Circuit officiel (boutons enseignant, notifications étudiant) :
+  SENT (envoyée) → RECEIVED (reçue) → PROCESSING (prise en charge)
+    → MORE_INFO (infos demandées, avec note) ⇄ PROCESSING (réponse étudiant)
+    → {RESOLVED (acceptée + motif), REJECTED (rejetée + motif)} = Terminé.
+
 Toute transition hors table est refusée. `apply_status()` pose les horodatages
 d'analytique (`received_at`, `resolved_at`) et une entrée d'historique
-immuable (`TicketStatusHistory`) de façon atomique.
+immuable (`TicketStatusHistory`) de façon atomique. Une décision finale exige
+toujours son motif (acceptation comme rejet) : l'étudiant est notifié avec.
 """
 
 from django.db import transaction
@@ -110,10 +114,16 @@ def apply_status(
         # La question reste consultable dans l'historique ; on l'archive à la reprise.
         locked.complementary_info_request = ""
 
-    # Réponse visible par l'étudiant sur une validation (jamais sur un rejet,
-    # qui porte déjà son motif obligatoire).
+    # Décision finale (acceptée) : motif / réponse obligatoire, visible par
+    # l'étudiant. Sur un rejet, le motif obligatoire joue déjà ce rôle.
     if new_status == Ticket.Status.RESOLVED:
-        locked.resolution_note = (resolution_note or "").strip()
+        resolution_note = (resolution_note or reason or "").strip()
+        if not resolution_note:
+            raise StatusTransitionError(
+                _("Un motif est obligatoire pour accepter une requête."),
+                {"resolution_note": _("Champ obligatoire.")},
+            )
+        locked.resolution_note = resolution_note
     else:
         locked.resolution_note = ""
 

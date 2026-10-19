@@ -1,5 +1,6 @@
 {% load i18n %}
-{# B6 — Transmission d'un dossier à un intervenant et/ou à un service. #}
+{# Transmission par l'enseignant assigné vers un autre enseignant et/ou un service. #}
+{# L'admin ne réaffecte jamais : lecture seule (détail, statut, temps de traitement). #}
 <form id="teacher-transfer-form" class="space-y-4" novalidate
       data-transfer-url="{% url 'tickets:teacher_transfer' %}"
       data-detail-url="{% url 'tickets:ticket_detail' ticket.id %}"

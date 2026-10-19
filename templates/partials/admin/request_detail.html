@@ -51,6 +51,12 @@
             <div class="shrink-0 text-right text-xs text-slate-500 tabular-nums">
                 <p>{% trans "Créée le" %} {{ ticket.created_at|date:"d/m/Y H:i" }}</p>
                 <p>{% trans "MAJ" %} {{ ticket.updated_at|date:"d/m/Y H:i" }}</p>
+                {% if processing.is_done and processing.closed_at %}
+                    <p>{% trans "Clôturée le" %} {{ processing.closed_at|date:"d/m/Y H:i" }}</p>
+                {% endif %}
+                <p class="font-semibold text-navy-dark">
+                    {% trans "Temps de traitement" %} : {{ processing.duration }}
+                </p>
                 <p class="text-slate-400">
                     {% blocktrans with d=max_days %}SLA : {{ d }} jours{% endblocktrans %}
                 </p>
@@ -87,80 +93,52 @@
         {% endif %}
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2">
-        {# ---- Affectation ---- #}
-        <div class="card p-4">
-            <h3 class="text-sm font-bold text-navy-dark">{% trans "Affectation" %}</h3>
-            <p class="helper !mt-0.5">
-                {% trans "Enseignant responsable actuel" %} :
-                <strong>{{ ticket.teacher.user.get_full_name|default:ticket.teacher.user.username }}</strong>
-            </p>
-            <form class="mt-3 space-y-3"
-                  method="post"
-                  action="{% url 'core_scolarite:admin_requests_assign' %}"
-                  data-console-form
-                  data-save-url="{% url 'core_scolarite:admin_requests_assign' %}"
-                  data-refresh="requests">
-                {% csrf_token %}
-                <input type="hidden" name="ticket" value="{{ ticket.id }}">
-                <label class="label" for="assign-teacher">{% trans "Réaffecter à" %}</label>
-                <select class="field" id="assign-teacher" name="teacher_id" required>
-                    <option value="">{% trans "Sélectionnez un enseignant" %}</option>
-                    {% for teacher in teachers %}
-                        <option value="{{ teacher.pk }}"
-                                {% if teacher.pk == ticket.teacher_id %}selected{% endif %}>
-                            {{ teacher.user.get_full_name|default:teacher.user.username }}
-                        </option>
-                    {% endfor %}
-                </select>
-                <div data-form-errors
-                     class="hidden rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                     role="alert">
-                    <ul data-form-errors-list class="list-inside list-disc space-y-0.5"></ul>
-                </div>
-                <button type="submit" class="btn btn-primary w-full">{% trans "Affecter" %}</button>
-            </form>
-        </div>
-
-        {# ---- Décision / transition ---- #}
-        <div class="card p-4">
-            <h3 class="text-sm font-bold text-navy-dark">{% trans "Transition de statut" %}</h3>
-            <form class="mt-3 space-y-3"
-                  method="post"
-                  action="{% url 'core_scolarite:admin_requests_status' %}"
-                  data-console-form
-                  data-save-url="{% url 'core_scolarite:admin_requests_status' %}"
-                  data-refresh="requests">
-                {% csrf_token %}
-                <input type="hidden" name="ticket" value="{{ ticket.id }}">
-                <div data-form-errors
-                     class="hidden rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                     role="alert">
-                    <ul data-form-errors-list class="list-inside list-disc space-y-0.5"></ul>
-                </div>
-                <div>
-                    <label class="label" for="status-note">
-                        {% trans "Note (motif de refus ou question à l'étudiant)" %}
-                    </label>
-                    <textarea class="field" id="status-note" name="note" rows="2"
-                              placeholder="{% trans 'Requis pour un refus ou une demande d’informations.' %}"></textarea>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    {% for action in actions %}
-                        <button type="submit"
-                                name="status"
-                                value="{{ action.status }}"
-                                class="btn {% if action.status == 'RESOLVED' %}btn-success{% elif action.status == 'REJECTED' %}btn-danger{% else %}btn-ghost{% endif %} !min-h-11 !w-auto px-4 text-sm">
-                            {{ action.label }}
-                        </button>
-                    {% empty %}
-                        <p class="text-sm text-slate-500">
-                            {% trans "Aucune transition possible depuis ce statut." %}
-                        </p>
-                    {% endfor %}
-                </div>
-            </form>
-        </div>
+    {# ---- Suivi (lecture seule) : statut piloté par l'enseignant ---- #}
+    <div class="card p-4">
+        <h3 class="text-sm font-bold text-navy-dark">{% trans "Suivi du traitement" %}</h3>
+        <p class="helper !mt-0.5">
+            {% trans "Le statut et l'affectation sont pilotés par l'enseignant : acquittement, prise en charge, demande d'informations et décision." %}
+        </p>
+        <dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">{% trans "Statut" %}</dt>
+                <dd class="text-right">
+                    {% include "components/status_badge.html" with status=ticket.status label=ticket.status_label %}
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">{% trans "Enseignant responsable" %}</dt>
+                <dd class="font-medium text-navy-dark text-right">
+                    {{ ticket.teacher.user.get_full_name|default:ticket.teacher.user.username }}
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">{% trans "Reçue le" %}</dt>
+                <dd class="font-medium text-navy-dark text-right tabular-nums">
+                    {{ ticket.received_at|date:"d/m/Y H:i"|default_if_none:"—" }}
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">{% trans "Dernière activité" %}</dt>
+                <dd class="font-medium text-navy-dark text-right tabular-nums">
+                    {{ ticket.updated_at|date:"d/m/Y H:i" }}
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">
+                    {% if processing.is_done %}{% trans "Temps de traitement" %}{% else %}{% trans "En cours depuis" %}{% endif %}
+                </dt>
+                <dd class="font-semibold text-navy-dark text-right tabular-nums">
+                    {{ processing.duration }}
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">{% trans "Clôturée le" %}</dt>
+                <dd class="font-medium text-navy-dark text-right tabular-nums">
+                    {{ processing.closed_at|date:"d/m/Y H:i"|default_if_none:"—" }}
+                </dd>
+            </div>
+        </dl>
     </div>
 
     {# ---- Historique ---- #}

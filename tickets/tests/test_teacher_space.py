@@ -1,10 +1,10 @@
 """
 Tests de l'espace enseignant (ARCHITECTURE §7.3, §9, §10).
 
-Couvre : permissions/périmètre (IDOR), auto-acquittement à l'ouverture de la
-boîte, filtres, transitions et notifications, feature flag MORE_INFO, accès
-protégé aux pièces jointes, et consumer WebSocket (authentification, isolation
-des groupes, canal lecture seule).
+Couvre : permissions/périmètre (IDOR), acquittement explicite (bouton « Reçu »),
+filtres, transitions et notifications, feature flag MORE_INFO, accès protégé
+aux pièces jointes, et consumer WebSocket (authentification, isolation des
+groupes, canal lecture seule).
 """
 
 import json
@@ -113,7 +113,9 @@ class TeacherPermissionsTests(TeacherSpaceBase):
         mine = self._ticket(status=Ticket.Status.RECEIVED)
         foreign = self._ticket(teacher=self.other_teacher, status=Ticket.Status.RECEIVED)
         self.client.force_login(self.teacher.user)
-        response = self.client.get("/tickets/teacher/")
+        response = self.client.get(
+            "/tickets/teacher/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, mine.id)
         self.assertNotContains(response, foreign.id)
@@ -127,11 +129,13 @@ class TeacherPermissionsTests(TeacherSpaceBase):
     def test_assigned_teacher_opens_detail_with_decision_rights(self):
         ticket = self._ticket(status=Ticket.Status.PROCESSING)
         self.client.force_login(self.teacher.user)
-        response = self.client.get(f"/tickets/{ticket.id}/detail/")
+        response = self.client.get(
+            f"/tickets/{ticket.id}/detail/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["can_decide"], True)
         # Boutons de décision réservés à l'enseignant assigné.
-        self.assertContains(response, "Valider")
+        self.assertContains(response, "Accepter")
 
     def test_owner_student_sees_detail_without_decision_actions(self):
         ticket = self._ticket(status=Ticket.Status.PROCESSING)
@@ -147,7 +151,8 @@ class TeacherPermissionsTests(TeacherSpaceBase):
         response = self.client.get(
             f"/tickets/teacher/decision/?ticket_id={ticket.id}&target=RESOLVED"
         )
-        self.assertEqual(response.status_code, 404)
+        # Dossier d'un autre enseignant : refus strict (403/404), jamais 200.
+        self.assertIn(response.status_code, (403, 404))
 
     def test_status_endpoint_requires_teacher_role(self):
         ticket = self._ticket(status=Ticket.Status.PROCESSING)
@@ -173,19 +178,16 @@ class TeacherPermissionsTests(TeacherSpaceBase):
 
 
 class TeacherInboxFlowTests(TeacherSpaceBase):
-    """Ouverture de la boîte : acquittement automatique SENT → RECEIVED."""
+    """Acquittement explicite : SENT → RECEIVED par le bouton « Reçu »."""
 
-    def test_opening_inbox_acknowledges_sent_tickets(self):
+    def test_opening_inbox_does_not_acknowledge(self):
+        """Aucune mutation implicite : le statut n'avance que par un bouton."""
         ticket = self._ticket(status=Ticket.Status.SENT)
         self.client.force_login(self.teacher.user)
         self.client.get("/tickets/teacher/")
         ticket.refresh_from_db()
-        self.assertEqual(ticket.status, Ticket.Status.RECEIVED)
-        self.assertIsNotNone(ticket.received_at)
-        entry = ticket.status_history.latest("created_at")
-        self.assertEqual(entry.from_status, Ticket.Status.SENT)
-        self.assertEqual(entry.to_status, Ticket.Status.RECEIVED)
-        self.assertEqual(entry.actor, self.teacher.user)
+        self.assertEqual(ticket.status, Ticket.Status.SENT)
+        self.assertIsNone(ticket.received_at)
 
     def test_inbox_list_endpoint_does_not_acknowledge(self):
         """La liste seule (refresh temps réel) ne déclenche aucune mutation."""
@@ -195,14 +197,34 @@ class TeacherInboxFlowTests(TeacherSpaceBase):
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.SENT)
 
+    def test_detail_shows_received_button_on_sent_ticket(self):
+        ticket = self._ticket(status=Ticket.Status.SENT)
+        self.client.force_login(self.teacher.user)
+        response = self.client.get(
+            f"/tickets/{ticket.id}/detail/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-status-action="RECEIVED"')
+
     def test_acknowledge_notifies_student(self):
         ticket = self._ticket(status=Ticket.Status.SENT)
         self.client.force_login(self.teacher.user)
         with self.captureOnCommitCallbacks(execute=True):
-            self.client.get("/tickets/teacher/")
+            response = self.client.post(
+                "/tickets/ajax/status/",
+                {"ticket_id": str(ticket.id), "status": Ticket.Status.RECEIVED},
+            )
+        self.assertEqual(response.status_code, 200)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.RECEIVED)
+        self.assertIsNotNone(ticket.received_at)
+        entry = ticket.status_history.latest("created_at")
+        self.assertEqual(entry.from_status, Ticket.Status.SENT)
+        self.assertEqual(entry.to_status, Ticket.Status.RECEIVED)
+        self.assertEqual(entry.actor, self.teacher.user)
         self.assertTrue(
             Notification.objects.filter(
-                user=self.student.user, ticket=ticket, is_read=False
+                user=self.student.user, ticket=ticket, title="Requête reçue"
             ).exists()
         )
         # L'acteur ne reçoit jamais sa propre notification.
@@ -318,10 +340,25 @@ class TeacherDecisionTests(TeacherSpaceBase):
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.PROCESSING)
 
+    def test_take_ownership_notifies_student(self):
+        ticket = self._ticket(status=Ticket.Status.RECEIVED)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self._post_status(ticket, Ticket.Status.PROCESSING)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.student.user,
+                ticket=ticket,
+                title="Prise en charge — en cours de traitement",
+            ).exists()
+        )
+
     def test_resolve_journals_history_and_notifies_student(self):
         ticket = self._ticket(status=Ticket.Status.PROCESSING)
         with self.captureOnCommitCallbacks(execute=True):
-            response = self._post_status(ticket, Ticket.Status.RESOLVED)
+            response = self._post_status(
+                ticket, Ticket.Status.RESOLVED, resolution_note="Dossier validé."
+            )
         self.assertEqual(response.status_code, 200)
         ticket.refresh_from_db()
         self.assertEqual(ticket.status, Ticket.Status.RESOLVED)
@@ -373,7 +410,7 @@ class TeacherDecisionTests(TeacherSpaceBase):
         """Décision concurrente : le ticket a muté entre lecture et écriture."""
         ticket = self._ticket(status=Ticket.Status.PROCESSING)
         stale = Ticket.objects.get(pk=ticket.pk)
-        self._post_status(ticket, Ticket.Status.RESOLVED)
+        self._post_status(ticket, Ticket.Status.RESOLVED, resolution_note="Dossier validé.")
         from tickets.services.status_machine import (
             StatusTransitionError,
             apply_status,
@@ -418,13 +455,17 @@ class TeacherDecisionTests(TeacherSpaceBase):
     @override_settings(ENABLE_TEACHER_MORE_INFO=False)
     def test_more_info_button_hidden_when_flag_disabled(self):
         ticket = self._ticket(status=Ticket.Status.PROCESSING)
-        response = self.client.get(f"/tickets/{ticket.id}/detail/")
+        response = self.client.get(
+            f"/tickets/{ticket.id}/detail/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertNotContains(response, "target=MORE_INFO")
 
     @override_settings(ENABLE_TEACHER_MORE_INFO=True)
     def test_more_info_button_visible_when_flag_enabled(self):
         ticket = self._ticket(status=Ticket.Status.PROCESSING)
-        response = self.client.get(f"/tickets/{ticket.id}/detail/")
+        response = self.client.get(
+            f"/tickets/{ticket.id}/detail/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertContains(response, "target=MORE_INFO")
 
 

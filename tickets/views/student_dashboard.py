@@ -174,8 +174,8 @@ def student_feed(request):
 # Étapes visibles du parcours étudiant (A4 : « étape actuelle »).
 TRACKING_STEPS = (
     ("sent", _("Envoyée")),
-    ("received", _("Prise en charge")),
-    ("processing", _("Analyse")),
+    ("received", _("Reçue")),
+    ("processing", _("En cours de traitement")),
     ("decision", _("Décision")),
 )
 STEP_BY_STATUS = {
@@ -284,6 +284,7 @@ def student_reply(request):
             actor=request.user,
             actor_role=TicketStatusHistory.ActorRole.STUDENT,
             note=str(_("Réponse fournie par l'étudiant.")),
+            notification_title=str(_("Réponse de l'étudiant")),
         )
     except StatusTransitionError as exc:
         return JsonResponse(

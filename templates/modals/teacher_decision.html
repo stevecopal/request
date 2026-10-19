@@ -1,7 +1,9 @@
 {% load i18n %}
 {% comment %}
-Modale de décision enseignant — Valider (RESOLVED), Rejeter (REJECTED + motif),
-Demander des infos (MORE_INFO + question obligatoire)
+Modale de décision enseignant — circuit officiel :
+Accepter (RESOLVED + motif obligatoire), Rejeter (REJECTED + motif),
+Demander des infos supplémentaires (MORE_INFO + note). Chaque décision
+notifie l'étudiant ; une fois Acceptée/Rejetée, la requête passe à Terminé.
 {% endcomment %}
 <form id="teacher-decision-form" class="space-y-4" novalidate
       method="post"
@@ -13,11 +15,11 @@ Demander des infos (MORE_INFO + question obligatoire)
 
     <p class="text-sm text-slate-600">
         {% if target == 'RESOLVED' %}
-            {% trans "Rédigez la réponse visible par l'étudiant : elle lui sera transmise avec la notification de validation." %}
+            {% trans "Rédigez le motif de l'acceptation (réponse visible par l'étudiant) : il lui sera transmis avec la notification et clôturera la requête en « Terminé »." %}
         {% elif target == 'MORE_INFO' %}
-            {% trans "Décrivez les informations demandées : l'étudiant pourra vous répondre depuis son suivi." %}
+            {% trans "Décrivez les informations demandées : l'étudiant pourra vous répondre depuis son suivi, puis le traitement reprendra." %}
         {% else %}
-            {% trans "Indiquez le motif du rejet : il sera transmis à l'étudiant." %}
+            {% trans "Indiquez le motif du rejet : il sera transmis à l'étudiant et clôturera la requête en « Terminé »." %}
         {% endif %}
     </p>
 
@@ -53,7 +55,7 @@ Demander des infos (MORE_INFO + question obligatoire)
 
     <button type="submit"
             class="btn {% if target == 'RESOLVED' %}btn-success{% elif target == 'MORE_INFO' %}btn-primary{% else %}btn-danger{% endif %}">
-        {% if target == 'RESOLVED' %}{% trans "Valider" %}
+        {% if target == 'RESOLVED' %}{% trans "Accepter" %}
         {% elif target == 'MORE_INFO' %}{% trans "Envoyer la demande" %}
         {% else %}{% trans "Rejeter" %}{% endif %}
     </button>

@@ -55,11 +55,6 @@ urlpatterns = [
         teacher_dashboard.teacher_transfer,
         name="teacher_transfer",
     ),
-    path(
-        "teacher/ajax/note/",
-        teacher_dashboard.teacher_add_note,
-        name="teacher_add_note",
-    ),
     path("<uuid:pk>/detail/", teacher_dashboard.ticket_detail, name="ticket_detail"),
     path(
         "<uuid:pk>/suivi/",

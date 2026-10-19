@@ -11,7 +11,7 @@ Routage de l'app core_scolarite — namespace « core_scolarite ».
 
   C1  /scolarite/admin/users/…            comptes (liste, modale, bascule, accès)
   C2  /scolarite/admin/structure/…        organisation (onglets, modales, bascules)
-  C3  /scolarite/admin/requests/…         suivi central (liste, détail, actions)
+  C3  /scolarite/admin/requests/…         suivi central (consultation seule)
   C4  /scolarite/admin/workflow/…         configuration (types, champs, règles…)
   C5  /scolarite/admin/reports/…          statistiques + exports CSV/PDF
   C6  /scolarite/admin/security/…         audit, incidents, sessions
@@ -92,16 +92,6 @@ urlpatterns = [
         "admin/requests/detail/",
         admin_requests.admin_requests_detail,
         name="admin_requests_detail",
-    ),
-    path(
-        "admin/requests/assign/",
-        admin_requests.admin_requests_assign,
-        name="admin_requests_assign",
-    ),
-    path(
-        "admin/requests/status/",
-        admin_requests.admin_requests_status,
-        name="admin_requests_status",
     ),
     # --- C4 : workflow ------------------------------------------------------- #
     path("admin/workflow/", admin_workflow.admin_workflow, name="admin_workflow"),

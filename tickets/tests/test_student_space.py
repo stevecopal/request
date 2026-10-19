@@ -130,7 +130,9 @@ class StudentDetailTests(StudentSpaceBase):
         ticket.complementary_info_request = "Envoyez le relevé."
         ticket.save(update_fields=["complementary_info_request"])
         self.client.force_login(self.student.user)
-        response = self.client.get(f"/tickets/{ticket.id}/suivi/")
+        response = self.client.get(
+            f"/tickets/{ticket.id}/suivi/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertContains(response, "Envoyez le relevé.")
 
 

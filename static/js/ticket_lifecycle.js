@@ -8,10 +8,9 @@
  *   - [data-notifications-read]  : marquage « lu » + badge de navigation ;
  *   - [data-ticket-select]       : charge le détail dans #teacher-ticket-detail ;
  *   - [data-status-action]       : transition directe (Démarrer l'analyse…) ;
- *   - #teacher-decision-form     : Valider / Rejeter (motif) / Plus d'infos
- *     (question obligatoire) ;
- *   - #teacher-note-form         : note interne, avis, recommandation, anomalie ;
- *   - #teacher-transfer-form     : transmission à un intervenant / service.
+ *   - #teacher-decision-form     : Accepter (motif) / Rejeter (motif) /
+ *     Infos supplémentaires (note obligatoire) ;
+ *   - #teacher-transfer-form     : transmission à un autre enseignant / service.
  */
 (function () {
   "use strict";
@@ -611,48 +610,7 @@
     });
   }
 
-  /** B4/B5 — analyse interne : le serveur filtre `is_internal` côté étudiant. */
-  function handleTeacherNoteForm(form) {
-    var submit = form.querySelector('[type="submit"]');
-    var errorBox = form.querySelector("#teacher-note-error");
-
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      if (errorBox) errorBox.classList.add("hidden");
-      var bodyField = form.querySelector('[name="body"]');
-      if (!bodyField || !bodyField.value.trim()) {
-        errorBoxOf(errorBox, "Le contenu de l'analyse est obligatoire.");
-        if (bodyField) bodyField.focus();
-        return;
-      }
-
-      setBusy(submit, true);
-      api
-        .apiFetch(form.getAttribute("data-note-url"), {
-          method: "POST",
-          body: new FormData(form),
-        })
-        .then(function (result) {
-          api.showNotification(
-            result.data.message || "Analyse enregistrée.",
-            "success"
-          );
-          var detail = form.getAttribute("data-detail-url");
-          if (detail) loadDetail(detail);
-        })
-        .catch(function (err) {
-          var message =
-            (err.data && err.data.message) || err.message || "Enregistrement impossible.";
-          errorBoxOf(errorBox, message);
-          api.showNotification(message, "error");
-        })
-        .then(function () {
-          setBusy(submit, false);
-        });
-    });
-  }
-
-  /** B6 — transmission : le dossier peut quitter le périmètre courant. */
+  /** Transmission enseignant → enseignant/service (avec motif + notifs). */
   function handleTeacherTransferForm(form) {
     var submit = form.querySelector('[type="submit"]');
     var errorBox = form.querySelector("#transfer-error");
@@ -725,11 +683,6 @@
     if (replyForm && !replyForm.dataset.wired) {
       replyForm.dataset.wired = "1";
       handleReplyForm(replyForm);
-    }
-    var noteForm = root.querySelector("#teacher-note-form");
-    if (noteForm && !noteForm.dataset.wired) {
-      noteForm.dataset.wired = "1";
-      handleTeacherNoteForm(noteForm);
     }
     var transferForm = root.querySelector("#teacher-transfer-form");
     if (transferForm && !transferForm.dataset.wired) {

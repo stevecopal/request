@@ -1,10 +1,11 @@
 {% load i18n %}
 {# Tableau de bord enseignant — identité, vue d'ensemble, activité récente. #}
-<div class="rise space-y-6">
+{# Colonne stable : chaque bloc est contenu, aucun défilement latéral. #}
+<div class="rise min-w-0 max-w-full space-y-6 overflow-x-clip">
 
     {# ---- Bannière : identité mise en avant ---- #}
     <section class="dashboard-hero">
-        <div class="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div class="relative z-10 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 flex-1 items-center gap-4">
                 
                 <div class="min-w-0">
@@ -19,9 +20,9 @@
                 </div>
             </div>
             <button type="button"
-                    class="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl
+                    class="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl
                            bg-navy px-5 font-semibold text-white shadow-card transition-all
-                           hover:bg-navy-700 active:scale-95"
+                           hover:bg-navy-700 active:scale-95 sm:w-auto"
                     data-fragment-src="{% url 'tickets:teacher_inbox' %}">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -34,7 +35,7 @@
     </section>
 
     {# ---- Vue d'ensemble : cartes cliquables → boîte pré-filtrée ---- #}
-    <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
+    <section class="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
              aria-label="{% trans 'Statistiques' %}">
         <button type="button" class="stat-card text-left transition-transform hover:scale-[1.02]"
                 data-fragment-src="{% url 'tickets:teacher_inbox' %}">

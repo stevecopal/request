@@ -64,7 +64,11 @@ def _notification_text(instance, created):
             str(_("Nouvelle requête")),
             f"{problem_type} — {instance.student.full_name}",
         )
-    if instance.status == Ticket.Status.MORE_INFO:
+    if instance.status == Ticket.Status.RECEIVED:
+        title = str(_("Requête reçue"))
+    elif instance.status == Ticket.Status.PROCESSING:
+        title = str(_("Prise en charge — en cours de traitement"))
+    elif instance.status == Ticket.Status.MORE_INFO:
         title = str(_("Informations complémentaires demandées"))
     elif instance.status == Ticket.Status.REJECTED:
         title = str(_("Requête rejetée"))

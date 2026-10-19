@@ -1,4 +1,9 @@
-"""Administration Django — tickets (workflow, statuts, pièces jointes)."""
+"""Administration Django — tickets (workflow, statuts, pièces jointes).
+
+Lecture seule : le statut et l'affectation sont pilotés par l'enseignant
+assigné (espace enseignant). La console admin consulte le détail, le statut
+et le temps de traitement, sans décision ni réaffectation.
+"""
 
 from django.contrib import admin
 
@@ -39,7 +44,25 @@ class TicketAdmin(admin.ModelAdmin):
     autocomplete_fields = ("student", "teacher", "course", "problem_type")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
-    readonly_fields = ("id", "created_at", "updated_at")
+    readonly_fields = (
+        "id",
+        "student",
+        "teacher",
+        "course",
+        "problem_type",
+        "subject",
+        "description",
+        "academic_year",
+        "status",
+        "rejection_reason",
+        "resolution_note",
+        "complementary_info_request",
+        "assigned_service",
+        "received_at",
+        "resolved_at",
+        "created_at",
+        "updated_at",
+    )
     inlines = (TicketAttachmentInline, TicketStatusHistoryInline)
     fieldsets = (
         (None, {"fields": ("id", "status", "problem_type", "description")}),
@@ -51,6 +74,17 @@ class TicketAdmin(admin.ModelAdmin):
     @admin.display(description="Référence")
     def short_id(self, obj):
         return obj.short_id
+
+    def has_add_permission(self, request):
+        # Aucune création manuelle : les requêtes naissent côté étudiant.
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Lecture seule : statut et affectation pilotés par l'enseignant.
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(TicketStatusHistory)

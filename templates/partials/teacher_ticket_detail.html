@@ -252,36 +252,9 @@ la vue enseignant ; `can_decide` vient de `may_decide` côté serveur.
         </div>
     {% endif %}
 
-    {# ------------------ B4/B5 — Formulaire d'analyse ------------------ #}
-    {% if is_teacher_view %}
-        <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-            <h3 class="text-sm font-bold text-navy-dark">{% trans "Ajouter une analyse" %}</h3>
-            <p class="mt-1 text-xs text-slate-500">
-                {% trans "Note de travail, avis ou recommandation : ces contenus restent internes et ne sont jamais visibles par l'étudiant." %}
-            </p>
-            <form id="teacher-note-form" class="mt-3 space-y-3" novalidate
-                  data-note-url="{% url 'tickets:teacher_add_note' %}"
-                  data-detail-url="{% url 'tickets:ticket_detail' ticket.id %}">
-                {% csrf_token %}
-                <input type="hidden" name="ticket_id" value="{{ ticket.id }}">
-                <div>
-                    <label class="label" for="note-kind">{% trans "Type d'analyse" %}</label>
-                    <select class="field" id="note-kind" name="kind">
-                        {% for value, label in note_kinds %}
-                            <option value="{{ value }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="label" for="note-body">{% trans "Contenu" %}</label>
-                    <textarea class="field min-h-24" id="note-body" name="body" rows="3" required
-                              placeholder="{% trans 'Décrivez votre analyse, votre avis ou l’anomalie constatée…' %}"></textarea>
-                </div>
-                <p id="teacher-note-error" class="hidden text-sm font-medium text-red-600" role="alert"></p>
-                <button type="submit" class="btn btn-ghost">{% trans "Enregistrer l'analyse" %}</button>
-            </form>
-        </section>
-    {% endif %}
+    {# Workflow enseignant : boutons Reçu / Prise en charge / Infos / #}
+    {# Décision / Transfert. Le bloc « analyse interne » a été retiré : #}
+    {# seul le circuit officiel ci-dessous pilote le dossier. #}
 
     {# ------------------ B5/B6 — Décision & transmission ------------------ #}
     {% if can_decide or can_transfer %}
@@ -295,25 +268,38 @@ la vue enseignant ; `can_decide` vient de `may_decide` côté serveur.
             {% endif %}
 
             {% if can_decide %}
-                {% if ticket.status == 'RECEIVED' %}
+                {% if ticket.status == 'SENT' %}
+                    <p class="text-xs text-slate-500 text-center">
+                        {% trans "Confirmez la réception : l'étudiant sera notifié que sa requête est reçue." %}
+                    </p>
+                    <button type="button" class="btn btn-primary"
+                            data-status-action="RECEIVED"
+                            data-ticket-id="{{ ticket.id }}"
+                            data-status-url="{% url 'tickets:update_status' %}">
+                        {% trans "Reçu" %}
+                    </button>
+                {% elif ticket.status == 'RECEIVED' %}
+                    <p class="text-xs text-slate-500 text-center">
+                        {% trans "Prenez le dossier en charge : l'étudiant sera notifié que sa requête est en cours de traitement." %}
+                    </p>
                     <button type="button" class="btn btn-primary"
                             data-status-action="PROCESSING"
                             data-ticket-id="{{ ticket.id }}"
                             data-status-url="{% url 'tickets:update_status' %}">
-                        {% trans "Démarrer l'analyse" %}
+                        {% trans "Prise en charge" %}
                     </button>
                 {% elif ticket.status == 'PROCESSING' %}
                     {% if more_info_enabled %}
                         <button type="button" class="btn btn-primary"
                                 data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=MORE_INFO"
-                                data-modal-title="{% trans 'Demander des informations' %}">
-                            {% trans "Demander des informations" %}
+                                data-modal-title="{% trans 'Demander des informations supplémentaires' %}">
+                            {% trans "Demander des informations supplémentaires" %}
                         </button>
                     {% endif %}
                     <button type="button" class="btn btn-success"
                             data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=RESOLVED"
-                            data-modal-title="{% trans 'Valider la requête' %}">
-                        {% trans "Valider" %}
+                            data-modal-title="{% trans 'Accepter la requête' %}">
+                        {% trans "Accepter" %}
                     </button>
                     <button type="button" class="btn btn-danger"
                             data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=REJECTED"
@@ -322,33 +308,25 @@ la vue enseignant ; `can_decide` vient de `may_decide` côté serveur.
                     </button>
                 {% elif ticket.status == 'MORE_INFO' %}
                     <p class="text-xs text-slate-500 text-center">
-                        {% trans "En attente de la réponse de l'étudiant." %}
+                        {% trans "En attente de la réponse de l'étudiant : le traitement reprendra automatiquement à sa réponse." %}
                     </p>
                     <button type="button" class="btn btn-ghost"
                             data-status-action="PROCESSING"
                             data-ticket-id="{{ ticket.id }}"
                             data-status-url="{% url 'tickets:update_status' %}">
-                        {% trans "Reprendre l'analyse" %}
+                        {% trans "Reprendre le traitement" %}
                     </button>
                     <button type="button" class="btn btn-success"
                             data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=RESOLVED"
-                            data-modal-title="{% trans 'Valider la requête' %}">
-                        {% trans "Valider" %}
+                            data-modal-title="{% trans 'Accepter la requête' %}">
+                        {% trans "Accepter" %}
                     </button>
                     <button type="button" class="btn btn-danger"
                             data-modal-src="{% url 'tickets:teacher_decision_modal' %}?ticket_id={{ ticket.id }}&target=REJECTED"
                             data-modal-title="{% trans 'Rejeter la requête' %}">
                         {% trans "Rejeter" %}
                     </button>
-                {% elif ticket.status == 'SENT' %}
-                    <p class="text-xs text-slate-500 text-center">
-                        {% trans "En attente de votre prise en charge." %}
-                    </p>
                 {% endif %}
-            {% elif is_teacher_view %}
-                <p class="text-xs text-slate-500 text-center">
-                    {% trans "Consultation seule : les décisions sur ce dossier sont réservées aux rôles autorisés par le workflow." %}
-                </p>
             {% endif %}
         </div>
     {% elif is_teacher_view and ticket.status == 'MORE_INFO' %}

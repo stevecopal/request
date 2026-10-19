@@ -216,7 +216,7 @@ def nav_sections(role, unread_notifications=0):
                         _("Toutes les requêtes"),
                         reverse("core_scolarite:admin_requests"),
                         "inbox",
-                        description=_("Suivi central et affectation"),
+                        description=_("Suivi central : statut et temps de traitement"),
                     ),
                 ],
             }

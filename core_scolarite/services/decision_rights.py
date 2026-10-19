@@ -1,10 +1,13 @@
 """
-Droits de décision (C4) — « qui peut examiner, valider, refuser, clôturer ».
+Droits de décision — « qui peut examiner, valider, refuser, clôturer ».
 
-Base (inchangée) : l'enseignant **assigné** au dossier et les administrateurs
-peuvent toujours décider. Les `DecisionRule` actives du type de requête
-**élargissent** ce droit aux périmètres listés (enseignants du département,
-membres du service, administrateurs, enseignant assigné).
+Base : seul l'enseignant **assigné** au dossier peut décider (boutons Reçu,
+Prise en charge, Infos supplémentaires, Accepter, Rejeter, Transférer).
+L'administrateur (superuser) ne pilote ni le statut ni l'affectation : il
+consulte les requêtes en lecture seule (détail, statut, temps de traitement).
+Les `DecisionRule` actives du type de requête **élargissent** ce droit aux
+périmètres listés (enseignants du département, membres du service, enseignant
+assigné) — jamais aux administrateurs.
 
 Appelé par l'endpoint de décision (`tickets.views.status_processor`) avant
 toute transition — un refus vaut 403, sans effet de bord.
@@ -45,12 +48,32 @@ def action_for_status(new_status: str) -> str:
     return _ACTION_BY_TARGET.get(new_status, DecisionRule.Action.EXAMINE)
 
 
+def _is_assigned_teacher(user, ticket) -> bool:
+    """True si `user` est l'enseignant assigné (comparaison via le profil)."""
+    if ticket.teacher_id is None:
+        return False
+    try:
+        teacher = getattr(user, "teacher_profile", None)
+    except AttributeError:
+        teacher = None
+    # Profil présent (requêtes `@teacher_required`) → comparaison UUID exacte ;
+    # sinon repli sur l'ID utilisateur (ex. tests sans profil résolu).
+    if teacher is not None:
+        return ticket.teacher_id == teacher.pk
+    try:
+        teacher_user_id = ticket.teacher.user_id
+    except Exception:
+        return False
+    return teacher_user_id == user.pk
+
+
 def _matches(rule: DecisionRule, user, ticket) -> bool:
     scope = rule.scope
     if scope == DecisionRule.Scope.ASSIGNED:
-        return ticket.teacher_id is not None and user.pk == ticket.teacher_id
+        return _is_assigned_teacher(user, ticket)
     if scope == DecisionRule.Scope.ADMIN:
-        return bool(user.is_superuser)
+        # L'admin ne décide jamais (lecture seule) : ce périmètre est neutre.
+        return False
     if scope == DecisionRule.Scope.SERVICE:
         # Membres du service responsable du type OU du service destinataire
         # après transmission B6 (ticket.assigned_service).
@@ -79,16 +102,18 @@ def may_decide(user, ticket, action: str | None = None, new_status: str | None =
     """
     True si `user` peut prendre la décision sur `ticket`.
 
-    * administrateur (superuser) → toujours ;
-    * enseignant assigné → toujours (base inchangée) ;
+    * enseignant assigné → toujours (boutons du workflow enseignant) ;
+    * administrateur (superuser) → jamais : lecture seule (détail, statut,
+      temps de traitement), sans pilotage du statut ni de l'affectation ;
     * sinon → une règle active du type couvre l'action (« clôturer » couvre
       aussi valider/refuser, puisqu'il s'agit d'une décision terminale).
+      Le périmètre « administrateurs » d'une règle n'ouvre plus aucun droit.
     """
     if not getattr(user, "is_authenticated", False):
         return False
-    if user.is_superuser:
-        return True
-    if ticket.teacher_id is not None and user.pk == ticket.teacher_id:
+    if getattr(user, "is_superuser", False):
+        return False
+    if _is_assigned_teacher(user, ticket):
         return True
 
     if action is None:
