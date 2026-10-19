@@ -147,7 +147,9 @@ def departments(request):
     if not faculty_id:
         return JsonResponse({"status": "success", "departments": []})
     queryset = (
-        Department.objects.filter(faculty_id=faculty_id)
+        Department.objects.filter(
+            faculty_id=faculty_id, is_active=True, faculty__is_active=True
+        )
         .values("id", "name")
         .order_by("name")
     )

@@ -234,6 +234,15 @@ LOGGING = {
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+        # Erreurs/crítiques persistées en base (console C6 « Sécurité & audit »).
+        "database": {
+            "class": "core_scolarite.logging_handler.DatabaseLogHandler",
+            "level": "ERROR",
+            "formatter": "standard",
+        },
     },
-    "root": {"handlers": ["console"], "level": config("LOG_LEVEL", default="INFO")},
+    "root": {
+        "handlers": ["console", "database"],
+        "level": config("LOG_LEVEL", default="INFO"),
+    },
 }

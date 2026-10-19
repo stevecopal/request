@@ -66,6 +66,39 @@ def superuser_required(view):
     return wrapper
 
 
+def console_required(*perms):
+    """
+    Accès à un module de la console super-admin (C1–C6).
+
+    * super-administrateur → accès total ;
+    * sinon → il faut posséder **au moins une** des permissions Django
+      listées (module = frontière de capacité, attribuable depuis
+      « Comptes → Permissions »).
+
+    Les actions sensibles (émission d'accès, révocation de sessions,
+    retrait des droits d'administrateur) restent sous `superuser_required`.
+    Les échecs renvoient du JSON : toutes les vues de la console sont
+    consommées par `fetch()` (cf. docstring du module).
+    """
+
+    def decorator(view):
+        @wraps(view)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return _json_error(_("Authentication required."), 401)
+            if request.user.is_superuser:
+                return view(request, *args, **kwargs)
+            if perms and any(request.user.has_perm(perm) for perm in perms):
+                return view(request, *args, **kwargs)
+            return _json_error(
+                _("Insufficient permissions for this console module."), 403
+            )
+
+        return wrapper
+
+    return decorator
+
+
 def superuser_page_required(view):
     """
     Variante HTML de `superuser_required` pour les pages de la console :

@@ -101,6 +101,99 @@ class Enrollment(UUIDModel):
         return f"{self.student.registration_number} → {self.course.code}"
 
 
+class Service(UUIDModel):
+    """
+    Service administratif chargé d'un ou plusieurs types de requêtes (C2).
+
+    Un service regroupe les agents/enseignants qui traitent certaines
+    catégories de demandes (`ProblemType.service`) ; il appartient à une
+    université (isolation multi-tenants).
+    """
+
+    university = models.ForeignKey(
+        "accounts.University",
+        on_delete=models.PROTECT,
+        related_name="services",
+        verbose_name=_("université"),
+    )
+    name = models.CharField(_("nom"), max_length=150)
+    description = models.TextField(_("description"), blank=True)
+    contact_email = models.EmailField(
+        _("email de contact"), blank=True, help_text=_("Facultatif.")
+    )
+    is_active = models.BooleanField(_("actif"), default=True)
+    created_at = models.DateTimeField(_("créé le"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("service")
+        verbose_name_plural = _("services")
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["university", "name"], name="service_uni_name_uniq"
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class ServiceAssignment(UUIDModel):
+    """
+    Affectation d'un utilisateur (enseignant ou agent) à un service (C2).
+    `is_active` permet de retirer quelqu'un sans perdre la trace.
+    """
+
+    class Role(models.TextChoices):
+        COORDINATOR = "coordinator", _("Coordonnateur")
+        MEMBER = "member", _("Membre")
+
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+        verbose_name=_("service"),
+    )
+    user = models.ForeignKey(
+        "auth.User",
+        on_delete=models.CASCADE,
+        related_name="service_assignments",
+        verbose_name=_("utilisateur"),
+    )
+    role = models.CharField(
+        _("rôle"), max_length=12, choices=Role.choices, default=Role.MEMBER
+    )
+    is_active = models.BooleanField(_("actif"), default=True)
+    created_at = models.DateTimeField(_("créé le"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("affectation au service")
+        verbose_name_plural = _("affectations aux services")
+        ordering = ["service__name", "user__last_name", "user__first_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["service", "user"], name="service_assignment_uniq"
+            ),
+        ]
+
+    @property
+    def user_label(self) -> str:
+        return self.user.get_full_name() or self.user.username
+
+    @property
+    def user_role_label(self) -> str:
+        if getattr(self.user, "teacher_profile", None) is not None:
+            return str(_("Enseignant"))
+        if self.user.is_superuser:
+            return str(_("Administrateur"))
+        if getattr(self.user, "student_profile", None) is not None:
+            return str(_("Étudiant"))
+        return str(_("Agent"))
+
+    def __str__(self):
+        return f"{self.service.name} — {self.user_label} ({self.get_role_display()})"
+
+
 class ProblemType(UUIDModel):
     """
     Type de problème = règle de comportement du formulaire dynamique.
@@ -122,6 +215,16 @@ class ProblemType(UUIDModel):
     name = models.CharField(_("name"), max_length=100)
     description = models.TextField(
         _("description"), blank=True, help_text=_("Instructions shown to the student.")
+    )
+    # Service chargé de traiter ce type de demande (C2 « services »).
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="problem_types",
+        verbose_name=_("service"),
+        help_text=_("Service responsable du traitement de ce type."),
     )
     requires_course = models.BooleanField(
         _("requires course"),
@@ -593,6 +696,60 @@ class ConditionalRule(UUIDModel):
         return f"{self.field.key} ← {self.depends_on.key} ({self.get_operator_display()})"
 
 
+class DecisionRule(UUIDModel):
+    """
+    Règle « qui peut examiner / valider / refuser / clôturer » par type de
+    requête (C4).
+
+    Ces règles **élargissent** le droit de décision de base (enseignant
+    assigné + administrateurs) : sans règle, seul l'enseignant assigné peut
+    décider ; avec une règle active, les périmètres listés peuvent aussi
+    décider. Vérification centralisée dans
+    `core_scolarite.services.decision_rights`.
+    """
+
+    class Action(models.TextChoices):
+        EXAMINE = "examine", _("Examiner")
+        VALIDATE = "validate", _("Valider")
+        REJECT = "reject", _("Refuser")
+        CLOSE = "close", _("Clôturer")
+
+    class Scope(models.TextChoices):
+        ASSIGNED = "assigned_teacher", _("Enseignant assigné")
+        DEPARTMENT = "department_teachers", _("Enseignants du département")
+        SERVICE = "service_members", _("Membres du service")
+        ADMIN = "any_admin", _("Administrateurs")
+
+    problem_type = models.ForeignKey(
+        ProblemType,
+        on_delete=models.CASCADE,
+        related_name="decision_rules",
+        verbose_name=_("type de requête"),
+    )
+    action = models.CharField(_("action"), max_length=10, choices=Action.choices)
+    scope = models.CharField(_("périmètre"), max_length=20, choices=Scope.choices)
+    is_active = models.BooleanField(_("actif"), default=True)
+    position = models.PositiveIntegerField(_("ordre"), default=0)
+
+    class Meta:
+        verbose_name = _("règle de décision")
+        verbose_name_plural = _("règles de décision")
+        ordering = ["action", "position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["problem_type", "action", "scope"],
+                name="decision_rule_uniq",
+            ),
+        ]
+
+    @property
+    def university(self):
+        return getattr(self.problem_type, "university", None)
+
+    def __str__(self):
+        return f"{self.get_action_display()} ← {self.get_scope_display()} ({self.problem_type.name})"
+
+
 class AuditLog(UUIDModel):
     """
     Journal d'audit **immuable** des opérations administratives :
@@ -693,6 +850,67 @@ class AuditLog(UUIDModel):
         return f"{self.get_action_display()} — {self.model_label} {self.object_pk[:8]} ({who})"
 
 
+class TechnicalEvent(UUIDModel):
+    """
+    Erreur ou incident technique consultable depuis la console (C6).
+
+    Alimenté automatiquement par le handler de journalisation
+    (`core_scolarite.logging_handler.DatabaseLogHandler`, erreurs/crítiques)
+    ou manuellement par un administrateur (signalement d'incident).
+    """
+
+    class Level(models.TextChoices):
+        INFO = "INFO", _("Info")
+        WARNING = "WARNING", _("Avertissement")
+        ERROR = "ERROR", _("Erreur")
+        CRITICAL = "CRITICAL", _("Critique")
+
+    class Source(models.TextChoices):
+        SYSTEM = "system", _("Système")
+        MANUAL = "manual", _("Signalement manuel")
+
+    level = models.CharField(
+        _("niveau"), max_length=8, choices=Level.choices, default=Level.ERROR
+    )
+    source = models.CharField(
+        _("origine"), max_length=10, choices=Source.choices, default=Source.SYSTEM
+    )
+    logger = models.CharField(_("journal"), max_length=100, blank=True)
+    message = models.TextField(_("message"))
+    traceback = models.TextField(_("détail technique"), blank=True)
+    reported_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("signalé par"),
+    )
+    is_resolved = models.BooleanField(_("résolu"), default=False)
+    resolved_at = models.DateTimeField(_("résolu le"), null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("résolu par"),
+    )
+    created_at = models.DateTimeField(_("survenu le"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("incident technique")
+        verbose_name_plural = _("incidents techniques")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_at"], name="tevent_created_idx"),
+            models.Index(fields=["is_resolved", "created_at"], name="tevent_resolved_idx"),
+        ]
+
+    def __str__(self):
+        return f"[{self.level}] {self.message[:80]}"
+
+
 class SlaPolicy(UUIDModel):
     """
     Règle configurable : identification des requêtes **en retard** et des
@@ -708,6 +926,16 @@ class SlaPolicy(UUIDModel):
         verbose_name=_("université"),
     )
     name = models.CharField(_("nom"), max_length=150)
+    # Règle générale (vide) ou spécifique à un type de requête (C4 « délais »).
+    problem_type = models.ForeignKey(
+        ProblemType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sla_policies",
+        verbose_name=_("type de requête"),
+        help_text=_("Vide : règle applicable à toutes les requêtes du périmètre."),
+    )
     max_days = models.PositiveIntegerField(
         _("délai de traitement (jours)"),
         default=5,

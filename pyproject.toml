@@ -13,5 +13,6 @@ dependencies = [
     "psycopg[binary]>=3.3.6",
     "python-decouple>=3.8",
     "pywebpush>=2.0.3",
+    "reportlab>=5.0.1",
     "whitenoise>=6.12.0",
 ]

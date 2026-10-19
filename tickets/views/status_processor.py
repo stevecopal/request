@@ -51,8 +51,11 @@ def update_status(request):
             {"status": "error", "message": str(_("Requête introuvable."))}, status=404
         )
 
-    # Contrôle d'appartenance : jamais de mutation sur le ticket d'un autre.
-    if ticket.teacher_id != request.teacher.id:
+    # Droit de décision (C4) : enseignant assigné + administrateurs de base,
+    # éventuellement élargi par les règles du type de requête.
+    from core_scolarite.services.decision_rights import may_decide
+
+    if not may_decide(request.user, ticket, new_status=new_status):
         return JsonResponse(
             {"status": "error", "message": str(_("Action non autorisée."))}, status=403
         )

@@ -1,0 +1,330 @@
+{% load i18n %}
+{# C6 — Sécurité : journal d'audit, incidents techniques, sessions actives.   #}
+{# Toute action est confirmée puis POSTée en JSON (admin_console.js).         #}
+<div class="rise space-y-4">
+    <section class="dashboard-hero">
+        <div class="relative z-10 flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-extrabold text-navy-dark sm:text-3xl">
+                    {% trans "Sécurité & audit" %}
+                </h1>
+                <p class="mt-1.5 text-sm text-slate-500">
+                    {% trans "Traçabilité des actions, incidents techniques et sessions ouvertes." %}
+                </p>
+            </div>
+            <button type="button"
+                    class="btn btn-ghost !w-auto !min-h-12 bg-white/90"
+                    data-modal-src="{% url 'core_scolarite:admin_security_incident_modal' %}"
+                    data-modal-title="{% trans 'Signaler un incident' %}">
+                {% trans "Signaler un incident" %}
+            </button>
+        </div>
+    </section>
+
+    {# ================= Journal d'audit ================= #}
+    <section class="card overflow-hidden" aria-labelledby="audit-title">
+        <div class="border-b border-slate-100 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="audit-title" class="text-sm font-bold text-navy-dark">
+                    {% trans "Journal d'audit" %}
+                </h2>
+                <span class="text-xs text-slate-500">
+                    {% blocktrans with n=audit_page.paginator.count %}{{ n }} entrée(s){% endblocktrans %}
+                </span>
+            </div>
+            <form class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5"
+                  data-console-filter
+                  data-list-url="{% url 'core_scolarite:admin_security' %}">
+                <select name="action" class="field" aria-label="{% trans 'Action' %}">
+                    <option value="">{% trans "Toutes les actions" %}</option>
+                    {% for value, label in audit_actions %}
+                        <option value="{{ value }}" {% if active.action == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="q" class="field"
+                       placeholder="{% trans 'Acteur, entité, objet…' %}"
+                       value="{{ active.q }}">
+                <input type="date" name="date_from" class="field" aria-label="{% trans 'Du' %}"
+                       value="{{ active.date_from }}">
+                <input type="date" name="date_to" class="field" aria-label="{% trans 'Au' %}"
+                       value="{{ active.date_to }}">
+                <button type="submit" class="btn btn-ghost !min-h-11 px-4 text-sm">
+                    {% trans "Filtrer" %}
+                </button>
+            </form>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th class="px-4 py-2.5 font-semibold">{% trans "Date" %}</th>
+                        <th class="px-4 py-2.5 font-semibold">{% trans "Acteur" %}</th>
+                        <th class="px-4 py-2.5 font-semibold">{% trans "Action" %}</th>
+                        <th class="px-4 py-2.5 font-semibold">{% trans "Entité" %}</th>
+                        <th class="px-4 py-2.5 font-semibold">{% trans "Objet" %}</th>
+                        <th class="px-4 py-2.5 font-semibold">{% trans "IP" %}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for entry in audit_page %}
+                        <tr class="hover:bg-slate-50/70">
+                            <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-slate-500">
+                                {{ entry.created_at|date:"d/m/Y H:i" }}
+                            </td>
+                            <td class="px-4 py-2.5 text-navy-dark">
+                                {% if entry.actor %}
+                                    {{ entry.actor.get_full_name|default:entry.actor.username }}
+                                {% else %}
+                                    <span class="text-slate-400">{% trans "Compte supprimé" %}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2.5">
+                                <span class="badge-status bg-slate-100 text-slate-700">
+                                    {{ entry.get_action_display }}
+                                </span>
+                            </td>
+                            <td class="whitespace-nowrap px-4 py-2.5 text-slate-500">{{ entry.model_label }}</td>
+                            <td class="max-w-56 truncate px-4 py-2.5 text-slate-600">{{ entry.object_repr }}</td>
+                            <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-slate-400">
+                                {{ entry.ip|default:"—" }}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">
+                                {% trans "Aucune entrée." %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if audit_page.paginator.num_pages > 1 %}
+            <nav class="flex items-center justify-between gap-2 border-t border-slate-100 p-3"
+                 aria-label="{% trans 'Pagination du journal' %}">
+                {% if audit_page.has_previous %}
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm"
+                            data-fragment-src="?{% if page_qs %}{{ page_qs }}&amp;{% endif %}audit_page={{ audit_page.previous_page_number }}">
+                        {% trans "Précédent" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+                <span class="text-xs tabular-nums text-slate-500">
+                    {{ audit_page.number }} / {{ audit_page.paginator.num_pages }}
+                </span>
+                {% if audit_page.has_next %}
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm"
+                            data-fragment-src="?{% if page_qs %}{{ page_qs }}&amp;{% endif %}audit_page={{ audit_page.next_page_number }}">
+                        {% trans "Suivant" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </section>
+
+    {# ================= Incidents techniques ================= #}
+    <section class="card overflow-hidden" aria-labelledby="events-title">
+        <div class="border-b border-slate-100 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="events-title" class="text-sm font-bold text-navy-dark">
+                    {% trans "Incidents techniques" %}
+                </h2>
+                <span class="badge-status bg-orange-100 text-orange-700">
+                    {% blocktrans with n=open_events %}{{ n }} non résolu(s){% endblocktrans %}
+                </span>
+            </div>
+            <form class="mt-3 flex flex-wrap gap-2"
+                  data-console-filter
+                  data-list-url="{% url 'core_scolarite:admin_security' %}">
+                <select name="level" class="field !w-auto min-w-40" aria-label="{% trans 'Niveau' %}">
+                    <option value="">{% trans "Tous les niveaux" %}</option>
+                    {% for value, label in levels %}
+                        <option value="{{ value }}" {% if active.level == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <select name="state" class="field !w-auto min-w-40" aria-label="{% trans 'État' %}">
+                    <option value="">{% trans "Tous les états" %}</option>
+                    <option value="open" {% if active.state == "open" %}selected{% endif %}>
+                        {% trans "Non résolus" %}
+                    </option>
+                    <option value="resolved" {% if active.state == "resolved" %}selected{% endif %}>
+                        {% trans "Résolus" %}
+                    </option>
+                </select>
+                <button type="submit" class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm">
+                    {% trans "Filtrer" %}
+                </button>
+            </form>
+        </div>
+
+        <ul class="divide-y divide-slate-100">
+            {% for event in event_page %}
+                <li class="p-4 {% if not event.is_resolved %}bg-orange-50/40{% endif %}">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                {% if event.level == "CRITICAL" %}
+                                    <span class="badge-status bg-red-100 text-red-700">{{ event.get_level_display }}</span>
+                                {% elif event.level == "ERROR" %}
+                                    <span class="badge-status bg-orange-100 text-orange-700">{{ event.get_level_display }}</span>
+                                {% elif event.level == "WARNING" %}
+                                    <span class="badge-status bg-amber-100 text-amber-700">{{ event.get_level_display }}</span>
+                                {% else %}
+                                    <span class="badge-status bg-slate-100 text-slate-600">{{ event.get_level_display }}</span>
+                                {% endif %}
+                                <span class="text-xs text-slate-400">{{ event.get_source_display }}</span>
+                                {% if event.logger %}
+                                    <span class="text-xs text-slate-400">{{ event.logger }}</span>
+                                {% endif %}
+                                {% if event.is_resolved %}
+                                    <span class="badge-status bg-emerald-100 text-emerald-700">{% trans "Résolu" %}</span>
+                                {% else %}
+                                    <span class="badge-status bg-orange-100 text-orange-700">{% trans "Ouvert" %}</span>
+                                {% endif %}
+                            </div>
+                            <p class="mt-1.5 whitespace-pre-line break-words text-sm text-slate-700">
+                                {{ event.message|truncatechars:600 }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-400">
+                                {{ event.created_at|date:"d/m/Y H:i" }}
+                                {% if event.reported_by %} · {% trans "Signalé par" %} {{ event.reported_by.username }}{% endif %}
+                                {% if event.resolved_at %} · {% trans "Résolu le" %} {{ event.resolved_at|date:"d/m/Y H:i" }}{% endif %}
+                            </p>
+                            {% if event.traceback %}
+                                <details class="mt-2 rounded-xl border border-slate-100 bg-slate-50 p-2">
+                                    <summary class="cursor-pointer text-xs font-semibold text-navy">
+                                        {% trans "Détail technique" %}
+                                    </summary>
+                                    <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] text-slate-600">{{ event.traceback }}</pre>
+                                </details>
+                            {% endif %}
+                        </div>
+                        {% if not event.is_resolved %}
+                            <button type="button"
+                                    class="btn btn-ghost !min-h-11 !w-auto shrink-0 px-3 text-sm"
+                                    data-console-action
+                                    data-action-url="{% url 'core_scolarite:admin_security_event_resolve' %}"
+                                    data-pk="{{ event.pk }}"
+                                    data-confirm="{% trans 'Marquer cet incident comme résolu' %} ?">
+                                {% trans "Marquer résolu" %}
+                            </button>
+                        {% endif %}
+                    </div>
+                </li>
+            {% empty %}
+                <li class="p-6 text-center text-sm text-slate-500">{% trans "Aucun incident." %}</li>
+            {% endfor %}
+        </ul>
+
+        {% if event_page.paginator.num_pages > 1 %}
+            <nav class="flex items-center justify-between gap-2 border-t border-slate-100 p-3"
+                 aria-label="{% trans 'Pagination des incidents' %}">
+                {% if event_page.has_previous %}
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm"
+                            data-fragment-src="?{% if page_qs %}{{ page_qs }}&amp;{% endif %}event_page={{ event_page.previous_page_number }}">
+                        {% trans "Précédent" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+                <span class="text-xs tabular-nums text-slate-500">
+                    {{ event_page.number }} / {{ event_page.paginator.num_pages }}
+                </span>
+                {% if event_page.has_next %}
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm"
+                            data-fragment-src="?{% if page_qs %}{{ page_qs }}&amp;{% endif %}event_page={{ event_page.next_page_number }}">
+                        {% trans "Suivant" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </section>
+
+    {# ================= Sessions actives ================= #}
+    <section class="card overflow-hidden" aria-labelledby="sessions-title">
+        <div class="border-b border-slate-100 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="sessions-title" class="text-sm font-bold text-navy-dark">
+                    {% trans "Sessions actives" %}
+                </h2>
+                <span class="text-xs text-slate-500">
+                    {% blocktrans with n=session_page.paginator.count %}{{ n }} session(s){% endblocktrans %}
+                </span>
+            </div>
+        </div>
+
+        <ul class="divide-y divide-slate-100">
+            {% for row in session_rows %}
+                <li class="flex flex-wrap items-center justify-between gap-3 p-4">
+                    <div class="min-w-0">
+                        <p class="flex flex-wrap items-center gap-2 font-medium text-navy-dark">
+                            {{ row.username }}
+                            {% if row.is_self %}
+                                <span class="badge-status bg-navy-50 text-navy">{% trans "Votre session" %}</span>
+                            {% endif %}
+                        </p>
+                        <p class="mt-0.5 text-xs tabular-nums text-slate-500">
+                            {{ row.key_prefix }} ·
+                            {% trans "expire le" %} {{ row.session.expire_date|date:"d/m/Y H:i" }}
+                            {% if row.last_login %} · {% trans "dernier accès" %} {{ row.last_login|date:"d/m/Y H:i" }}{% endif %}
+                        </p>
+                    </div>
+                    {% if can_revoke %}
+                        <button type="button"
+                                class="btn btn-danger !min-h-11 !w-auto shrink-0 px-3 text-sm"
+                                data-console-action
+                                data-action-url="{% url 'core_scolarite:admin_security_session_revoke' %}"
+                                data-session-key="{{ row.session.session_key }}"
+                                {% if row.is_self %}disabled title="{% trans 'Impossible de révoquer votre propre session.' %}"{% else %}data-confirm="{% trans 'Révoquer la session de' %} {{ row.username }} ?"{% endif %}>
+                            {% trans "Révoquer" %}
+                        </button>
+                    {% endif %}
+                </li>
+            {% empty %}
+                <li class="p-6 text-center text-sm text-slate-500">{% trans "Aucune session active." %}</li>
+            {% endfor %}
+        </ul>
+
+        {% if session_page.paginator.num_pages > 1 %}
+            <nav class="flex items-center justify-between gap-2 border-t border-slate-100 p-3"
+                 aria-label="{% trans 'Pagination des sessions' %}">
+                {% if session_page.has_previous %}
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm"
+                            data-fragment-src="?{% if page_qs %}{{ page_qs }}&amp;{% endif %}session_page={{ session_page.previous_page_number }}">
+                        {% trans "Précédent" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+                <span class="text-xs tabular-nums text-slate-500">
+                    {{ session_page.number }} / {{ session_page.paginator.num_pages }}
+                </span>
+                {% if session_page.has_next %}
+                    <button type="button"
+                            class="btn btn-ghost !min-h-11 !w-auto px-4 text-sm"
+                            data-fragment-src="?{% if page_qs %}{{ page_qs }}&amp;{% endif %}session_page={{ session_page.next_page_number }}">
+                        {% trans "Suivant" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </section>
+</div>

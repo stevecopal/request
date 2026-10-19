@@ -1,0 +1,97 @@
+{% load i18n %}
+{# Fragment de modale générique de la console (C1–C6). #}
+{# Rendu par views/common.render_modal : un seul template pour tous les     #}
+{# formulaires — champs pilotés par ConsoleFormMixin (classe « field »).     #}
+{% if form %}
+    <form class="space-y-4"
+          novalidate
+          method="post"
+          action="{{ save_url }}"
+          data-console-form
+          data-save-url="{{ save_url }}">
+        {% csrf_token %}
+
+        <div data-form-errors
+             class="hidden rounded-xl border border-red-200 bg-red-50 p-3"
+             role="alert">
+            <p class="text-sm font-semibold text-red-700" data-form-errors-title>
+                {% trans "Formulaire invalide." %}
+            </p>
+            <ul class="mt-1 list-inside list-disc space-y-0.5 text-sm text-red-700"
+                data-form-errors-list></ul>
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="rounded-xl border border-red-200 bg-red-50 p-3">
+                <ul class="list-inside list-disc text-sm text-red-700">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+
+        {% for field in form.visible_fields %}
+            <div data-field="{{ field.name }}">
+                {% if field.field.widget.input_type == "checkbox" %}
+                    <label class="flex items-center gap-2.5 text-sm font-medium text-navy-dark"
+                           for="{{ field.id_for_label }}">
+                        {{ field }}
+                        <span>{{ field.label }}</span>
+                    </label>
+                {% else %}
+                    <label class="label" for="{{ field.id_for_label }}">
+                        {{ field.label }}
+                        {% if field.field.required %}
+                            <span class="text-red-600" aria-hidden="true">*</span>
+                        {% endif %}
+                    </label>
+                    {{ field }}
+                {% endif %}
+                {% if field.help_text %}
+                    <p class="helper">{{ field.help_text|safe }}</p>
+                {% endif %}
+                {% for error in field.errors %}
+                    <p class="mt-1 text-xs font-medium text-red-600">{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="btn btn-primary w-full">{% trans "Enregistrer" %}</button>
+    </form>
+{% elif credential_user %}
+    {# Modale C1 « émission d'accès » : le mot de passe s'affiche une fois. #}
+    <div class="space-y-4">
+        <p class="text-sm text-slate-600">
+            {% blocktrans with name=credential_user.username %}
+                Régénère le mot de passe de <strong>{{ name }}</strong>.
+                Il sera affiché <strong>une seule fois</strong> : transmettez-le
+                hors canal, il n'est ni enregistré ni journalisé.
+            {% endblocktrans %}
+        </p>
+
+        <div data-credential-box class="hidden rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                {% trans "Mot de passe à usage unique" %}
+            </p>
+            <code class="mt-2 block select-all break-all rounded-lg bg-white p-3 text-sm font-bold text-navy-dark"
+                  data-credential-value></code>
+            <p class="mt-2 text-xs text-emerald-700">
+                {% trans "Affiché une seule fois — la prochaine génération l'invalidera." %}
+            </p>
+        </div>
+
+        <form method="post"
+              action="{{ save_url }}"
+              data-console-form
+              data-save-url="{{ save_url }}"
+              data-keep-open>
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger w-full">
+                {% trans "Générer un nouveau mot de passe" %}
+            </button>
+        </form>
+    </div>
+{% endif %}

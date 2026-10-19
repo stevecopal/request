@@ -55,7 +55,8 @@ class OnboardingForm(forms.Form):
 
     faculty = forms.ModelChoiceField(
         label=_("Faculté"),
-        queryset=Faculty.objects.all(),
+        # Seules les facultés actives sont proposées à l'onboarding (C2).
+        queryset=Faculty.objects.filter(is_active=True),
         empty_label=_("Sélectionnez une faculté"),
     )
     department = forms.ModelChoiceField(
@@ -74,7 +75,7 @@ class OnboardingForm(forms.Form):
             faculty_id = getattr(self.initial["faculty"], "pk", self.initial["faculty"])
         if faculty_id:
             self.fields["department"].queryset = Department.objects.filter(
-                faculty_id=faculty_id
+                faculty_id=faculty_id, is_active=True
             )
 
     def clean(self):

@@ -1,0 +1,148 @@
+{% load i18n %}
+{# C4 — Workflow : onglets de configuration (catégories, champs, règles…).    #}
+{# Les onglets liés à une catégorie travaillent sur `current_type` (scope).   #}
+<div class="rise space-y-4">
+    <section class="dashboard-hero">
+        <div class="relative z-10">
+            <h1 class="text-2xl font-extrabold text-navy-dark sm:text-3xl">
+                {% trans "Workflow & formulaires" %}
+            </h1>
+            <p class="mt-1.5 text-sm text-slate-500">
+                {% trans "Catégories, champs, pièces jointes, délais, relances et règles de décision." %}
+            </p>
+        </div>
+    </section>
+
+    {# ---- Onglets ---- #}
+    <nav class="flex gap-2 overflow-x-auto pb-1" aria-label="{% trans 'Sections du workflow' %}">
+        {% for item in tabs %}
+            <button type="button"
+                    class="btn btn-ghost !min-h-11 !w-auto shrink-0 px-4 text-sm {% if item.key == tab %}!bg-navy !text-white{% endif %}"
+                    data-fragment-src="{% url 'core_scolarite:admin_workflow' %}?tab={{ item.key }}"
+                    {% if item.key == tab %}aria-current="page"{% endif %}>
+                {{ item.label }}
+                {% if item.count != None %}
+                    <span class="ml-1 rounded-full {% if item.key == tab %}bg-white/20{% else %}bg-slate-100{% endif %} px-2 py-0.5 text-xs tabular-nums">
+                        {{ item.count }}
+                    </span>
+                {% endif %}
+            </button>
+        {% endfor %}
+    </nav>
+
+    {# ---- Sélecteur de catégorie (onglets liés) ---- #}
+    {% if type_dependent %}
+        <div class="card flex flex-wrap items-end gap-3 p-4">
+            <div class="min-w-56 flex-1">
+                <label class="label" for="workflow-type">{% trans "Catégorie de requête" %}</label>
+                <select id="workflow-type"
+                        name="type"
+                        class="field"
+                        data-fragment-select
+                        data-fragment-base="{% url 'core_scolarite:admin_workflow' %}"
+                        data-fragment-keep="tab={{ tab }}">
+                    {% for type in type_choices %}
+                        <option value="{{ type.pk }}"
+                                {% if current_type and type.pk == current_type.pk %}selected{% endif %}>
+                            {{ type.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if current_type %}
+                <button type="button"
+                        class="btn btn-primary !w-auto !min-h-12"
+                        data-modal-src="{% url 'core_scolarite:admin_workflow_modal' kind %}{% if current_type %}?type={{ current_type.pk }}{% endif %}"
+                        data-modal-title="{% trans 'Ajouter' %}">
+                    {% trans "Ajouter" %}
+                </button>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="card flex flex-wrap items-end justify-between gap-3 p-4">
+            <p class="helper !mt-0">
+                {% trans "Les éléments désactivés restent visibles dans l'historique des requêtes." %}
+            </p>
+            <button type="button"
+                    class="btn btn-primary !w-auto !min-h-12"
+                    data-modal-src="{% url 'core_scolarite:admin_workflow_modal' kind %}"
+                    data-modal-title="{% trans 'Ajouter' %}">
+                {% trans "Ajouter" %}
+            </button>
+        </div>
+    {% endif %}
+
+    {# ---- Liste ---- #}
+    {% if rows %}
+        <ul class="space-y-3">
+            {% for row in rows %}
+                <li class="rise rise-item card p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-semibold text-navy-dark">{{ row.title }}</span>
+                                {% if show_active %}
+                                    {% if row.is_active %}
+                                        <span class="badge-status bg-emerald-100 text-emerald-700">{% trans "Actif" %}</span>
+                                    {% else %}
+                                        <span class="badge-status bg-red-100 text-red-700">{% trans "Inactif" %}</span>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            {% if row.subtitle %}
+                                <p class="mt-0.5 truncate text-sm text-slate-500">{{ row.subtitle }}</p>
+                            {% endif %}
+                            {% if row.meta %}
+                                <p class="mt-1 flex flex-wrap gap-1.5">
+                                    {% for item in row.meta %}
+                                        <span class="badge-status bg-slate-100 text-slate-600">{{ item }}</span>
+                                    {% endfor %}
+                                </p>
+                            {% endif %}
+                        </div>
+                        <div class="flex shrink-0 flex-wrap gap-2">
+                            <button type="button"
+                                    class="btn btn-ghost !min-h-11 !w-auto px-3 text-sm"
+                                    data-modal-src="{% url 'core_scolarite:admin_workflow_modal' kind %}?pk={{ row.pk }}{% if type_dependent %}&amp;type={{ current_type.pk }}{% endif %}"
+                                    data-modal-title="{% trans 'Modifier' %}">
+                                {% trans "Modifier" %}
+                            </button>
+                            {% if can_toggle %}
+                                <button type="button"
+                                        class="btn {% if row.is_active %}btn-danger{% else %}btn-success{% endif %} !min-h-11 !w-auto px-3 text-sm"
+                                        data-console-action
+                                        data-action-url="{% url 'core_scolarite:admin_workflow_toggle' kind %}"
+                                        data-pk="{{ row.pk }}">
+                                    {% if row.is_active %}{% trans "Désactiver" %}{% else %}{% trans "Réactiver" %}{% endif %}
+                                </button>
+                            {% endif %}
+                            {% if can_delete %}
+                                <button type="button"
+                                        class="btn btn-danger !min-h-11 !w-auto px-3 text-sm"
+                                        data-console-action
+                                        data-action-url="{% url 'core_scolarite:admin_workflow_delete' kind %}"
+                                        data-pk="{{ row.pk }}"
+                                        data-confirm="{% trans 'Supprimer définitivement' %} — {{ row.title }} ?">
+                                    {% trans "Supprimer" %}
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="card p-8 text-center">
+            <p class="text-base font-semibold text-navy-dark">
+                {% if type_dependent and not has_types %}
+                    {% trans "Créez d'abord une catégorie de requête." %}
+                {% else %}
+                    {% trans "Aucun élément de configuration." %}
+                {% endif %}
+            </p>
+            <p class="mt-1 text-sm text-slate-500">
+                {% trans "Tout est prêt par défaut — ajoutez un élément pour personnaliser." %}
+            </p>
+        </div>
+    {% endif %}
+</div>

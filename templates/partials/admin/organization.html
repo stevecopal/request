@@ -1,0 +1,129 @@
+{% load i18n %}
+{# C2 — Organisation : onglets (facultés → services) + liste + actions.      #}
+{# Désactivation douce uniquement : aucune suppression dans ce module.        #}
+<div class="rise space-y-4">
+    <section class="dashboard-hero">
+        <div class="relative z-10">
+            <h1 class="text-2xl font-extrabold text-navy-dark sm:text-3xl">
+                {% trans "Structure académique" %}
+            </h1>
+            <p class="mt-1.5 text-sm text-slate-500">
+                {% trans "Facultés, départements, filières, services et affectations." %}
+            </p>
+        </div>
+    </section>
+
+    {# ---- Onglets ---- #}
+    <nav class="flex gap-2 overflow-x-auto pb-1"
+         aria-label="{% trans "Catégories d'organisation" %}">
+        {% for kind in kinds %}
+            <button type="button"
+                    class="btn btn-ghost !min-h-11 !w-auto shrink-0 px-4 text-sm {% if kind.key == tab %}!bg-navy !text-white{% endif %}"
+                    data-fragment-src="{% url 'core_scolarite:admin_organization' %}?tab={{ kind.key }}"
+                    {% if kind.key == tab %}aria-current="page"{% endif %}>
+                {{ kind.label }}
+                <span class="ml-1 rounded-full {% if kind.key == tab %}bg-white/20{% else %}bg-slate-100{% endif %} px-2 py-0.5 text-xs tabular-nums">
+                    {{ kind.count }}
+                </span>
+            </button>
+        {% endfor %}
+    </nav>
+
+    {# ---- Barre d'action d'ajout ---- #}
+    <div class="card flex flex-wrap items-end gap-3 p-4">
+        {% if tab == "member" %}
+            <div class="min-w-48 flex-1">
+                <label class="label" for="member-service">{% trans "Service" %}</label>
+                <select id="member-service"
+                        class="field"
+                        data-modal-target="#member-add-btn"
+                        data-modal-base="{% url 'core_scolarite:admin_organization_modal' 'member' %}">
+                    <option value="">{% trans "Choisissez un service…" %}</option>
+                    {% for service in services %}
+                        <option value="{{ service.pk }}">{{ service.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="button"
+                    id="member-add-btn"
+                    class="btn btn-primary !w-auto !min-h-12"
+                    disabled
+                    data-modal-src=""
+                    data-modal-title="{% trans 'Ajouter un membre' %}">
+                {% trans "Ajouter un membre" %}
+            </button>
+        {% else %}
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold text-navy-dark">{{ kind_spec.plural }}</p>
+                <p class="helper !mt-0">
+                    {% trans "Les éléments désactivés restent visibles dans l'historique." %}
+                </p>
+            </div>
+            <button type="button"
+                    class="btn btn-primary !w-auto !min-h-12"
+                    data-modal-src="{% url 'core_scolarite:admin_organization_modal' tab %}"
+                    data-modal-title="{% trans 'Ajouter' %} — {{ kind_spec.label }}">
+                {% trans "Ajouter" %} — {{ kind_spec.label }}
+            </button>
+        {% endif %}
+    </div>
+
+    {# ---- Liste ---- #}
+    {% if rows %}
+        <ul class="space-y-3">
+            {% for row in rows %}
+                <li class="rise rise-item card p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-semibold text-navy-dark">{{ row.title }}</span>
+                                {% if row.is_active %}
+                                    <span class="badge-status bg-emerald-100 text-emerald-700">{% trans "Actif" %}</span>
+                                {% else %}
+                                    <span class="badge-status bg-red-100 text-red-700">{% trans "Inactif" %}</span>
+                                {% endif %}
+                            </div>
+                            {% if row.subtitle %}
+                                <p class="mt-0.5 truncate text-sm text-slate-500">{{ row.subtitle }}</p>
+                            {% endif %}
+                            {% if row.meta %}
+                                <p class="mt-1 flex flex-wrap gap-1.5">
+                                    {% for item in row.meta %}
+                                        <span class="badge-status bg-slate-100 text-slate-600">{{ item }}</span>
+                                    {% endfor %}
+                                </p>
+                            {% endif %}
+                        </div>
+                        <div class="flex shrink-0 gap-2">
+                            {% if tab != "member" %}
+                                <button type="button"
+                                        class="btn btn-ghost !min-h-11 !w-auto px-3 text-sm"
+                                        data-modal-src="{% url 'core_scolarite:admin_organization_modal' tab %}?pk={{ row.pk }}"
+                                        data-modal-title="{% trans 'Modifier' %} — {{ row.title }}">
+                                    {% trans "Modifier" %}
+                                </button>
+                            {% endif %}
+                            <button type="button"
+                                    class="btn {% if row.is_active %}btn-danger{% else %}btn-success{% endif %} !min-h-11 !w-auto px-3 text-sm"
+                                    data-console-action
+                                    data-action-url="{% url 'core_scolarite:admin_organization_toggle' tab %}"
+                                    data-pk="{{ row.pk }}"
+                                    data-confirm="{% if row.is_active %}{% trans 'Désactiver' %}{% else %}{% trans 'Réactiver' %}{% endif %} — {{ row.title }} ?">
+                                {% if row.is_active %}{% trans "Désactiver" %}{% else %}{% trans "Réactiver" %}{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="card p-8 text-center">
+            <p class="text-base font-semibold text-navy-dark">
+                {% trans "Aucun élément dans cette catégorie." %}
+            </p>
+            <p class="mt-1 text-sm text-slate-500">
+                {% trans "Utilisez le bouton ci-dessus pour créer le premier élément." %}
+            </p>
+        </div>
+    {% endif %}
+</div>

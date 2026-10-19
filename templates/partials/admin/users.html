@@ -1,0 +1,167 @@
+{% load i18n %}
+{# C1 — Liste des comptes : recherche, filtres, actions d'édition (modale). #}
+<div class="rise space-y-4">
+    <section class="dashboard-hero">
+        <div class="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-extrabold text-navy-dark sm:text-3xl">
+                    {% trans "Comptes utilisateurs" %}
+                </h1>
+                <p class="mt-1.5 text-sm text-slate-500">
+                    {% trans "Étudiants, enseignants et administrateurs — édition, rôles et permissions." %}
+                </p>
+            </div>
+            <div class="flex shrink-0 gap-2">
+                <span class="badge-status bg-navy-100 text-navy">{{ counts.total }} {% trans "au total" %}</span>
+                <span class="badge-status bg-emerald-100 text-emerald-700">{{ counts.active }} {% trans "actifs" %}</span>
+                <span class="badge-status bg-red-100 text-red-700">{{ counts.inactive }} {% trans "inactifs" %}</span>
+            </div>
+        </div>
+    </section>
+
+    {# ---- Filtres ---- #}
+    <form class="card space-y-3 p-4"
+          data-console-filter
+          data-list-url="{% url 'core_scolarite:admin_users' %}">
+        <div class="flex gap-2">
+            <label class="sr-only" for="users-q">{% trans "Rechercher" %}</label>
+            <input type="search"
+                   id="users-q"
+                   name="q"
+                   class="field"
+                   value="{{ active.q }}"
+                   placeholder="{% trans 'Nom, matricule, email…' %}">
+            <button type="submit" class="btn btn-primary !w-auto !px-5 shrink-0">
+                {% trans "Filtrer" %}
+            </button>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+                <label class="label" for="users-role">{% trans "Rôle" %}</label>
+                <select id="users-role" name="role" class="field">
+                    <option value="">{% trans "Tous les rôles" %}</option>
+                    {% for value, label in role_choices %}
+                        <option value="{{ value }}" {% if active.role == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="users-status">{% trans "État" %}</label>
+                <select id="users-status" name="status" class="field">
+                    <option value="">{% trans "Tous" %}</option>
+                    <option value="active" {% if active.status == "active" %}selected{% endif %}>{% trans "Actifs" %}</option>
+                    <option value="inactive" {% if active.status == "inactive" %}selected{% endif %}>{% trans "Inactifs" %}</option>
+                </select>
+            </div>
+            <div>
+                <label class="label" for="users-faculty">{% trans "Faculté" %}</label>
+                <select id="users-faculty" name="faculty" class="field">
+                    <option value="">{% trans "Toutes les facultés" %}</option>
+                    {% for faculty in faculties %}
+                        <option value="{{ faculty.id }}" {% if active.faculty == faculty.id|stringformat:'s' %}selected{% endif %}>
+                            {{ faculty.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% if has_filters %}
+            <button type="button"
+                    class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                    data-fragment-src="{% url 'core_scolarite:admin_users' %}">
+                {% trans "Réinitialiser" %}
+            </button>
+        {% endif %}
+    </form>
+
+    {# ---- Liste ---- #}
+    {% if rows %}
+        <ul class="space-y-3">
+            {% for row in rows %}
+                <li class="rise rise-item card p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-semibold text-navy-dark">{{ row.user.get_full_name|default:row.user.username }}</span>
+                                <span class="text-xs text-slate-400">@{{ row.user.username }}</span>
+                                {% if row.role == "admin" %}
+                                    <span class="badge-status bg-navy-100 text-navy">{{ row.role_label }}</span>
+                                {% elif row.role == "teacher" %}
+                                    <span class="badge-status bg-blue-100 text-blue-700">{{ row.role_label }}</span>
+                                {% elif row.role == "student" %}
+                                    <span class="badge-status bg-emerald-100 text-emerald-700">{{ row.role_label }}</span>
+                                {% else %}
+                                    <span class="badge-status bg-slate-100 text-slate-700">{{ row.role_label }}</span>
+                                {% endif %}
+                                {% if row.user.is_active %}
+                                    <span class="badge-status bg-emerald-100 text-emerald-700">{% trans "Actif" %}</span>
+                                {% else %}
+                                    <span class="badge-status bg-red-100 text-red-700">{% trans "Inactif" %}</span>
+                                {% endif %}
+                            </div>
+                            <p class="mt-1 truncate text-sm text-slate-500">
+                                {{ row.user.email|default:"—" }} · {{ row.placement }}
+                            </p>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap gap-2">
+                            <button type="button"
+                                    class="btn btn-ghost !min-h-11 !w-auto px-3 text-sm"
+                                    data-modal-src="{% url 'core_scolarite:admin_users_modal' %}?pk={{ row.user.pk }}"
+                                    data-modal-title="{% trans 'Modifier le compte' %}">
+                                {% trans "Modifier" %}
+                            </button>
+                            {% if is_superuser %}
+                                <button type="button"
+                                        class="btn btn-ghost !min-h-11 !w-auto px-3 text-sm"
+                                        data-modal-src="{% url 'core_scolarite:admin_users_credentials' %}?pk={{ row.user.pk }}"
+                                        data-modal-title="{% trans 'Émettre un accès' %}">
+                                    {% trans "Accès" %}
+                                </button>
+                            {% endif %}
+                            <button type="button"
+                                    class="btn {% if row.user.is_active %}btn-danger{% else %}btn-success{% endif %} !min-h-11 !w-auto px-3 text-sm"
+                                    data-console-action
+                                    data-action-url="{% url 'core_scolarite:admin_users_toggle' %}"
+                                    data-pk="{{ row.user.pk }}"
+                                    data-confirm="{% if row.user.is_active %}{% trans 'Désactiver ce compte ?' %}{% else %}{% trans 'Réactiver ce compte ?' %}{% endif %}">
+                                {% if row.user.is_active %}{% trans "Désactiver" %}{% else %}{% trans "Réactiver" %}{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav class="flex items-center justify-between gap-2"
+                 aria-label="{% trans 'Pagination des comptes' %}">
+                {% if page_obj.has_previous %}
+                    <button type="button"
+                            class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                            data-fragment-src="?{% if active_qs %}{{ active_qs }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">
+                        {% trans "Précédent" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+                <span class="text-xs tabular-nums text-slate-500">
+                    {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                </span>
+                {% if page_obj.has_next %}
+                    <button type="button"
+                            class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                            data-fragment-src="?{% if active_qs %}{{ active_qs }}&amp;{% endif %}page={{ page_obj.next_page_number }}">
+                        {% trans "Suivant" %}
+                    </button>
+                {% else %}
+                    <span></span>
+                {% endif %}
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="card p-8 text-center">
+            <p class="text-base font-semibold text-navy-dark">{% trans "Aucun compte ne correspond." %}</p>
+            <p class="mt-1 text-sm text-slate-500">{% trans "Modifiez vos filtres ou créez un compte." %}</p>
+        </div>
+    {% endif %}
+</div>

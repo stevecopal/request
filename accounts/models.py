@@ -43,6 +43,8 @@ class Faculty(UUIDModel):
         verbose_name=_("university"),
     )
     name = models.CharField(_("name"), max_length=150)
+    # Désactivation douce (C2) : jamais de suppression, l'historique est roi.
+    is_active = models.BooleanField(_("actif"), default=True)
 
     class Meta:
         verbose_name = _("faculty")
@@ -72,6 +74,7 @@ class Department(UUIDModel):
         verbose_name=_("faculty"),
     )
     name = models.CharField(_("name"), max_length=150)
+    is_active = models.BooleanField(_("actif"), default=True)
 
     class Meta:
         verbose_name = _("department")
@@ -284,6 +287,7 @@ class Program(UUIDModel):
         choices=Level.choices,
         default=Level.LICENCE,
     )
+    is_active = models.BooleanField(_("actif"), default=True)
 
     class Meta:
         verbose_name = _("programme")

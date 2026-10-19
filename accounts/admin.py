@@ -2,7 +2,16 @@
 
 from django.contrib import admin
 
-from .models import Department, Faculty, PushSubscription, Student, Teacher, University
+from .models import (
+    AcademicYear,
+    Department,
+    Faculty,
+    Program,
+    PushSubscription,
+    Student,
+    Teacher,
+    University,
+)
 
 
 @admin.register(University)
@@ -14,8 +23,8 @@ class UniversityAdmin(admin.ModelAdmin):
 
 @admin.register(Faculty)
 class FacultyAdmin(admin.ModelAdmin):
-    list_display = ("name", "university")
-    list_filter = ("university",)
+    list_display = ("name", "university", "is_active")
+    list_filter = ("university", "is_active")
     search_fields = ("name", "university__name")
     autocomplete_fields = ("university",)
     ordering = ("university", "name")
@@ -23,8 +32,8 @@ class FacultyAdmin(admin.ModelAdmin):
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
-    list_display = ("name", "faculty")
-    list_filter = ("faculty",)
+    list_display = ("name", "faculty", "is_active")
+    list_filter = ("faculty", "is_active")
     search_fields = ("name", "faculty__name")
     autocomplete_fields = ("faculty",)
     ordering = ("faculty", "name")
@@ -59,3 +68,19 @@ class PushSubscriptionAdmin(admin.ModelAdmin):
     list_display = ("user", "endpoint", "created_at")
     search_fields = ("user__username", "endpoint")
     readonly_fields = ("id", "endpoint", "p256dh", "auth", "created_at", "updated_at")
+
+
+@admin.register(Program)
+class ProgramAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "level", "department", "is_active")
+    list_filter = ("level", "is_active", "department__faculty")
+    search_fields = ("code", "name", "department__name")
+    ordering = ("department__faculty__name", "department__name", "code")
+
+
+@admin.register(AcademicYear)
+class AcademicYearAdmin(admin.ModelAdmin):
+    list_display = ("code", "start_date", "end_date", "is_current")
+    list_filter = ("is_current",)
+    search_fields = ("code",)
+    ordering = ("-code",)

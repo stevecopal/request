@@ -101,6 +101,12 @@ class Ticket(UUIDModel):
     form_data = models.JSONField(
         _("réponses au formulaire"), default=dict, blank=True
     )
+    # Escalade administrative d'un dossier complexe (C3) : tracée dans
+    # `escalated_at` + journal d'audit, visible en console.
+    is_escalated = models.BooleanField(_("escalé"), default=False)
+    escalated_at = models.DateTimeField(
+        _("escalé le"), null=True, blank=True
+    )
 
     class Meta:
         verbose_name = _("ticket")

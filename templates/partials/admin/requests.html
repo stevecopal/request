@@ -1,0 +1,138 @@
+{% load i18n %}
+{# C3 — Suivi central : filtres + liste (rafraîchissable) + panneau de détail. #}
+<div class="rise space-y-4">
+    <section class="dashboard-hero">
+        <div class="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-extrabold text-navy-dark sm:text-3xl">
+                    {% trans "Suivi central des requêtes" %}
+                </h1>
+                <p class="mt-1.5 text-sm text-slate-500">
+                    {% trans "Recherche, filtres, affectation et transitions de statut." %}
+                </p>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+                <span class="badge-status bg-slate-100 text-slate-700">
+                    {% blocktrans with n=total_filtered %}{{ n }} requête(s){% endblocktrans %}
+                </span>
+                <span class="badge-status bg-amber-100 text-amber-700">
+                    {% blocktrans with d=overdue_thresholds.0 %}Retard SLA > {{ d }} j{% endblocktrans %}
+                </span>
+            </div>
+        </div>
+    </section>
+
+    {# ---- Filtres ---- #}
+    <form class="card space-y-3 p-4"
+          data-console-filter
+          data-list-url="{% url 'core_scolarite:admin_requests' %}">
+        <div class="flex gap-2">
+            <label class="sr-only" for="req-q">{% trans "Rechercher" %}</label>
+            <input type="search"
+                   id="req-q"
+                   name="q"
+                   class="field"
+                   value="{{ filter_form.q.value|default_if_none:'' }}"
+                   placeholder="{% trans 'Étudiant, matricule, catégorie, cours…' %}">
+            <button type="submit" class="btn btn-primary !w-auto !px-5 shrink-0">
+                {% trans "Filtrer" %}
+            </button>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+                <label class="label" for="req-status">{% trans "Statut" %}</label>
+                <select id="req-status" name="status" class="field">
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}"
+                                {% if filter_form.status.value == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="req-faculty">{% trans "Faculté" %}</label>
+                <select id="req-faculty" name="faculty" class="field">
+                    <option value="">{% trans "Toutes les facultés" %}</option>
+                    {% for faculty in faculties %}
+                        <option value="{{ faculty.id }}"
+                                {% if filter_form.faculty.value == faculty.id|stringformat:'s' %}selected{% endif %}>
+                            {{ faculty.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="req-type">{% trans "Catégorie" %}</label>
+                <select id="req-type" name="problem_type" class="field">
+                    <option value="">{% trans "Toutes les catégories" %}</option>
+                    {% for type in filter_form.fields.problem_type.queryset %}
+                        <option value="{{ type.id }}"
+                                {% if filter_form.problem_type.value == type.id|stringformat:'s' %}selected{% endif %}>
+                            {{ type.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="label" for="req-from">{% trans "Du" %}</label>
+                    <input type="date" id="req-from" name="date_from" class="field"
+                           value="{{ filter_form.date_from.value|default_if_none:'' }}">
+                </div>
+                <div>
+                    <label class="label" for="req-to">{% trans "Au" %}</label>
+                    <input type="date" id="req-to" name="date_to" class="field"
+                           value="{{ filter_form.date_to.value|default_if_none:'' }}">
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 sm:col-span-2 lg:col-span-1">
+                <label class="flex items-center gap-2 text-sm font-medium text-navy-dark">
+                    <input type="checkbox" name="overdue" class="h-4 w-4 rounded border-slate-300"
+                           {% if filter_form.overdue.value %}checked{% endif %}>
+                    {% trans "En retard (SLA)" %}
+                </label>
+                <label class="flex items-center gap-2 text-sm font-medium text-navy-dark">
+                    <input type="checkbox" name="escalated" class="h-4 w-4 rounded border-slate-300"
+                           {% if filter_form.escalated.value %}checked{% endif %}>
+                    {% trans "Escaladées" %}
+                </label>
+            </div>
+        </div>
+        {% if has_filters %}
+            <button type="button"
+                    class="btn btn-ghost !w-auto !min-h-11 px-4 text-sm"
+                    data-fragment-src="{% url 'core_scolarite:admin_requests' %}">
+                {% trans "Réinitialiser les filtres" %}
+            </button>
+        {% endif %}
+    </form>
+
+    {# ---- Liste + détail ---- #}
+    <div class="grid items-start gap-6 lg:grid-cols-5">
+        <div class="lg:col-span-2"
+             id="admin-request-list"
+             data-list-url="{% url 'core_scolarite:admin_requests_list' %}"
+             data-active-qs="{{ active_qs }}"
+             data-detail-base="{% url 'core_scolarite:admin_requests_detail' %}">
+            {% include "partials/admin/requests_list.html" %}
+        </div>
+
+        <section id="admin-request-detail"
+                 class="hidden lg:block lg:col-span-3 lg:sticky lg:top-20"
+                 aria-live="polite">
+            <div class="card p-8 text-center text-slate-500">
+                <svg class="mx-auto h-10 w-10 text-navy-200" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                </svg>
+                <p class="mt-3 text-base font-semibold text-navy-dark">
+                    {% trans "Sélectionnez une requête" %}
+                </p>
+                <p class="mt-1 text-sm">{% trans "Le détail et les actions s'afficheront ici." %}</p>
+            </div>
+        </section>
+    </div>
+</div>
