@@ -60,7 +60,7 @@ jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
 
         <div>
             <label class="label" for="ticket-description">
-                {% trans "Commentaires" %} <span class="text-red-600" aria-hidden="true">*</span>
+                {% trans "Notes" %} <span class="text-red-600" aria-hidden="true">*</span>
             </label>
             <textarea class="field min-h-24 resize-none" id="ticket-description" name="description"
                       rows="4" required
@@ -80,7 +80,7 @@ jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
                 {% trans "Modifier" %}
             </button>
             <button type="submit" class="btn btn-primary" id="ticket-preview-confirm">
-                {% trans "Confirmer et envoyer" %}
+                {% trans " envoyer" %}
             </button>
         </div>
     </section>
@@ -89,12 +89,9 @@ jointes sont injectés par ticket_form_dynamic.js selon le type de problème.
 
     <div class="flex flex-wrap items-center gap-2">
         <button type="submit" class="btn btn-primary flex-1" id="ticket-submit">
-            {% trans "Prévisualiser la requête" %}
+            {% trans "Prévisualiser " %}
         </button>
-        <button type="button" class="btn btn-ghost !w-auto" id="ticket-draft-save"
-                data-draft-key="univreq_ticket_draft">
-            {% trans "Enregistrer le brouillon" %}
-        </button>
+       
     </div>
     <p id="ticket-draft-status" class="hidden text-xs text-emerald-600" role="status"></p>
 </form>
