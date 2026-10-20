@@ -5,8 +5,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from accounts.models import Department, Faculty, Student, Teacher
+from accounts.services import matricules
 from accounts.tests.factories import make_university
 from core_scolarite.models import AttachmentConfig, Course, ProblemType
+
+MATRICULE = f"CM-UDS-{matricules.registration_year() % 100:02d}SCI0001"
 
 
 def make_student(username, faculty, department):
@@ -83,7 +86,7 @@ class FormConfigTests(TestCase):
 class AdminImportTests(TestCase):
     def setUp(self):
         self.university = make_university()
-        Faculty.objects.create(university=self.university, name="Sciences")
+        Faculty.objects.create(university=self.university, name="Sciences", code="SCI")
         self.superuser = User.objects.create_superuser(
             username="ADMIN001", password="x", email="a@b.c"
         )
@@ -92,7 +95,7 @@ class AdminImportTests(TestCase):
     def _upload(self):
         content = (
             "MATRICULE,NOM,PRENOM,EMAIL,FACULTE,DEPARTEMENT\n"
-            "M1,Doe,John,john@univ.cm,Sciences,Informatique"
+            f"{MATRICULE},Doe,John,john@univ.cm,Sciences,Informatique"
         )
         return SimpleUploadedFile("f.csv", content.encode(), content_type="text/csv")
 

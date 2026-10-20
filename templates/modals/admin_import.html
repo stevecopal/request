@@ -1,10 +1,11 @@
 {% load i18n %}
-{# Modale d'import massif (super-admin) — erreurs ligne à ligne rendues dynamiquement #}
+{# Modale d'import massif (super-admin) — 2 phases : aperçu (rapport par ligne) puis confirmation #}
 <form id="admin-import-form" class="space-y-5" novalidate
       method="post"
-      action="{% url 'core_scolarite:admin_import_upload' %}"
-      enctype="multipart/form-data"
-      data-import-url="{% url 'core_scolarite:admin_import_upload' %}">
+      action="{% url 'core_scolarite:admin_import_preview' %}"
+      data-import-url="{% url 'core_scolarite:admin_import_preview' %}"
+      data-commit-url="{% url 'core_scolarite:admin_import_commit' %}"
+      data-template-url="{% url 'core_scolarite:admin_import_template' %}">
     {% csrf_token %}
 
     <div>
@@ -24,7 +25,20 @@
                accept=".csv,.xlsx" required>
         <p class="helper">
             {% trans "En-têtes requis : MATRICULE, NOM, PRENOM, EMAIL, FACULTE, DEPARTEMENT." %}
+            {% trans "Matricule attendu au format CM-UDS-22SCI0001." %}
         </p>
+        <a class="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-navy-light hover:underline"
+           id="import-template-link" href="{% url 'core_scolarite:admin_import_template' %}">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            {% trans "Télécharger le modèle (CSV)" %}
+        </a>
+        <a class="ml-3 inline-flex items-center gap-1.5 text-sm font-semibold text-navy-light hover:underline"
+           id="import-template-xlsx-link" href="{% url 'core_scolarite:admin_import_template' %}?format=xlsx">
+            {% trans "Modèle Excel (.xlsx)" %}
+        </a>
     </div>
 
     <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 cursor-pointer">
@@ -34,12 +48,58 @@
         </span>
     </label>
 
-    <div id="import-errors" class="hidden rounded-xl bg-red-50 border border-red-200 p-4" role="alert">
+    {# --- Rapport d'aperçu (rendu par admin_forms.js) -------------------- #}
+    <div id="import-report" class="hidden space-y-3" aria-live="polite">
+        <div id="import-report-card" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-sm font-bold text-navy-dark" id="import-report-title"></p>
+
+            <div class="mt-3 flex flex-wrap gap-2" id="import-report-stats">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                    <span data-stat="valid">0</span> {% trans "valide(s)" %}
+                </span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800" data-stat-errors>
+                    <span class="h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true"></span>
+                    <span data-stat="errors">0</span> {% trans "erreur(s)" %}
+                </span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800" data-stat-duplicates>
+                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+                    <span data-stat="duplicates">0</span> {% trans "doublon(s)" %}
+                </span>
+            </div>
+
+            <p class="mt-3 text-xs text-slate-600" id="import-report-summary"></p>
+        </div>
+
+        <div id="import-sample-block" class="hidden">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {% trans "Lignes validées (aperçu)" %}
+            </p>
+            <ul class="mt-1 max-h-32 space-y-1 overflow-y-auto text-xs text-navy-dark" id="import-sample-list"></ul>
+        </div>
+
+        <label id="import-skip-block" class="hidden items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 cursor-pointer">
+            <input type="checkbox" id="import-skip-invalid" class="mt-1 w-5 h-5 accent-navy">
+            <span class="text-sm text-amber-900" id="import-skip-label"></span>
+        </label>
+    </div>
+
+    <div id="import-errors" class="hidden rounded-2xl border border-red-200 bg-red-50 p-4" role="alert">
         <p class="text-sm font-semibold text-red-700" id="import-errors-title"></p>
         <ul class="mt-2 space-y-1 text-xs text-red-700 max-h-40 overflow-y-auto" id="import-errors-list"></ul>
     </div>
 
-    <button type="submit" class="btn btn-primary" id="import-submit">
-        {% trans "Lancer l'import" %}
-    </button>
+    <div class="flex flex-wrap items-center gap-3">
+        <button type="submit" class="btn btn-primary" id="import-submit">
+            {% trans "Valider le fichier" %}
+        </button>
+        <button type="button" class="btn btn-primary btn-auto hidden" id="import-confirm">
+            {% trans "Importer" %}
+        </button>
+        <button type="button" class="btn btn-ghost btn-auto hidden" id="import-restart">
+            {% trans "Corriger et recharger" %}
+        </button>
+    </div>
+
+   
 </form>

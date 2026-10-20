@@ -2403,6 +2403,14 @@ a:focus-visible,
   margin-top: 2rem;
 }
 
+.ml-3 {
+  margin-left: 0.75rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
 .line-clamp-2 {
   overflow: hidden;
   display: -webkit-box;
@@ -2412,6 +2420,10 @@ a:focus-visible,
 
 .block {
   display: block;
+}
+
+.inline-block {
+  display: inline-block;
 }
 
 .inline {
@@ -2516,6 +2528,10 @@ a:focus-visible,
 
 .max-h-\[84svh\] {
   max-height: 84svh;
+}
+
+.max-h-32 {
+  max-height: 8rem;
 }
 
 .\!min-h-10 {
@@ -2624,6 +2640,10 @@ a:focus-visible,
 
 .w-full {
   width: 100%;
+}
+
+.w-1\.5 {
+  width: 0.375rem;
 }
 
 .min-w-0 {
@@ -3312,6 +3332,11 @@ a:focus-visible,
   background-color: rgb(255 255 255 / 0.95);
 }
 
+.bg-red-500 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1));
+}
+
 .bg-gradient-to-br {
   background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
 }
@@ -3324,6 +3349,11 @@ a:focus-visible,
 
 .to-navy {
   --tw-gradient-to: #1E3A8A var(--tw-gradient-to-position);
+}
+
+.object-cover {
+  -o-object-fit: cover;
+     object-fit: cover;
 }
 
 .p-10 {
@@ -3764,6 +3794,11 @@ a:focus-visible,
 .text-white {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.text-emerald-800 {
+  --tw-text-opacity: 1;
+  color: rgb(6 95 70 / var(--tw-text-opacity, 1));
 }
 
 .accent-navy {

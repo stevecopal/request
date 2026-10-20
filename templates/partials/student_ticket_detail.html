@@ -101,13 +101,22 @@
             <p class="text-sm font-semibold text-navy-dark">{% trans "Pièces jointes" %}</p>
             <ul class="mt-2 space-y-2">
                 {% for attachment in ticket.attachments.all %}
-                    <li>
-                        <a class="flex items-center justify-between gap-3 min-h-11 rounded-xl border border-slate-200 px-3
-                                   transition-colors hover:border-navy hover:bg-navy-50"
-                           href="{% url 'tickets:download_attachment' attachment.id %}">
-                            <span class="text-sm text-navy-dark truncate">{{ attachment.config.label }}</span>
-                            <span class="text-xs font-semibold text-navy-light">{% trans "Télécharger" %}</span>
-                        </a>
+                    <li class="flex items-center justify-between gap-3 min-h-11 rounded-xl border border-slate-200 px-3
+                               transition-colors hover:border-navy hover:bg-navy-50">
+                        <span class="text-sm text-navy-dark truncate">{{ attachment.config.label }}</span>
+                        <span class="flex items-center gap-3 shrink-0">
+                            {% if attachment.is_image or attachment.file_extension == 'pdf' %}
+                                <a class="text-xs font-semibold text-navy-light"
+                                   href="{% url 'tickets:download_attachment' attachment.id %}?inline=1"
+                                   target="_blank" rel="noopener">
+                                    {% trans "Consulter" %}
+                                </a>
+                            {% endif %}
+                            <a class="text-xs font-semibold text-navy-light"
+                               href="{% url 'tickets:download_attachment' attachment.id %}">
+                                {% trans "Télécharger" %}
+                            </a>
+                        </span>
                     </li>
                 {% endfor %}
             </ul>
@@ -179,12 +188,23 @@
                         </div>
                         <p class="text-xs text-slate-600 mt-1 whitespace-pre-line">{{ comment.body }}</p>
                         {% if comment.file %}
-                            <a class="mt-1.5 inline-flex items-center gap-2 text-xs font-semibold text-navy-light
-                                      hover:underline"
-                               href="{% url 'tickets:download_comment_file' comment.id %}">
-                                <span class="truncate max-w-[16rem]">{{ comment.file_basename }}</span>
-                                <span>({% trans "Télécharger" %})</span>
-                            </a>
+                            <span class="mt-1.5 inline-flex items-center gap-2 text-xs">
+                                <a class="font-semibold text-navy-light hover:underline truncate max-w-[16rem]"
+                                   href="{% url 'tickets:download_comment_file' comment.id %}">
+                                    {{ comment.file_basename }}
+                                </a>
+                                {% if comment.file_extension == 'pdf' or comment.is_image %}
+                                    <a class="font-semibold text-navy-light hover:underline"
+                                       href="{% url 'tickets:download_comment_file' comment.id %}?inline=1"
+                                       target="_blank" rel="noopener">
+                                        ({% trans "Consulter" %})
+                                    </a>
+                                {% endif %}
+                                <a class="font-semibold text-navy-light hover:underline"
+                                   href="{% url 'tickets:download_comment_file' comment.id %}">
+                                    ({% trans "Télécharger" %})
+                                </a>
+                            </span>
                         {% endif %}
                     </li>
                 {% endfor %}

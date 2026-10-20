@@ -110,9 +110,17 @@
     });
   }
 
+  // Ciblage volontairement étroit : les dépôts de documents étudiant
+  // (création de requête, réponse à une demande d'information). Les
+  // formulaires d'administration (import, comptes) restent inchangés.
+  var SELECTOR =
+    '#ticket-form input[type="file"], ' +
+    '#student-reply-form input[type="file"], ' +
+    'form[data-upload-preview] input[type="file"]';
+
   function wireAll(root) {
     if (!root || !root.querySelectorAll) return;
-    root.querySelectorAll('form input[type="file"]').forEach(wire);
+    root.querySelectorAll(SELECTOR).forEach(wire);
   }
 
   document.addEventListener("DOMContentLoaded", function () {

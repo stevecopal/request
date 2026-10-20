@@ -256,7 +256,14 @@ def admin_users_toggle(request):
 @require_http_methods(["GET", "POST"])
 @superuser_required
 def admin_users_credentials(request):
-    """Émission d'un mot de passe à usage unique (affiché une seule fois)."""
+    """
+    Émission d'accès — procédure contrôlée par le super-administrateur.
+
+    * `mode=password` (défaut) : mot de passe à usage unique, affiché une fois ;
+    * `mode=link` : lien de première connexion (à usage unique, expirable),
+      pour le cas où l'adresse e-mail du titulaire est inaccessible. Le lien
+      est affiché **une seule fois** à l'émetteur et tracé à l'audit.
+    """
     target = scoped_object(User, request, scope=None, university=None, param="pk")
     if target is None:
         return json_error(_("Compte introuvable."), status=404)
@@ -268,6 +275,32 @@ def admin_users_credentials(request):
             title=_("Émettre un accès — %(name)s") % {"name": target.username},
             save_url=request.get_full_path(),
             extra={"credential_user": target},
+        )
+
+    if (request.POST.get("mode") or "password") == "link":
+        from accounts.models import AccessLink
+        from accounts.services import access_links
+
+        _issued, raw_token = access_links.issue_link(
+            target, AccessLink.Purpose.ACTIVATION, created_by=request.user
+        )
+        url = access_links.link_url(
+            raw_token, AccessLink.Purpose.ACTIVATION, request=request
+        )
+        audit_service.record(
+            request,
+            audit_service.AuditLog.Action.CREDENTIALS,
+            obj=target,
+            changes={"link": "activation", "channel": "admin"},
+        )
+        # Le lien n'est ni journalisé ni conservé : affiché une seule fois.
+        return json_ok(
+            _(
+                "Lien de première connexion généré. Transmettez-le hors canal : "
+                "il est à usage unique et expire automatiquement."
+            ),
+            username=target.username,
+            link=url,
         )
 
     password = issue_one_time_password(target)

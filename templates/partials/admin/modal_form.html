@@ -73,7 +73,8 @@
         </p>
 
         <div data-credential-box class="hidden rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700"
+               data-credential-label>
                 {% trans "Mot de passe à usage unique" %}
             </p>
             <code class="mt-2 block select-all break-all rounded-lg bg-white p-3 text-sm font-bold text-navy-dark"
@@ -89,8 +90,25 @@
               data-save-url="{{ save_url }}"
               data-keep-open>
             {% csrf_token %}
+            <input type="hidden" name="mode" value="password">
             <button type="submit" class="btn btn-danger w-full">
                 {% trans "Générer un nouveau mot de passe" %}
+            </button>
+        </form>
+
+        {# Procédure contrôlée : e-mail du titulaire inaccessible. #}
+        <form method="post"
+              action="{{ save_url }}"
+              data-console-form
+              data-save-url="{{ save_url }}"
+              data-keep-open>
+            {% csrf_token %}
+            <input type="hidden" name="mode" value="link">
+            <p class="mb-2 text-xs text-slate-500">
+                {% trans "E-mail inaccessible ? Générez un lien de première connexion à usage unique, à transmettre hors canal." %}
+            </p>
+            <button type="submit" class="btn btn-ghost w-full">
+                {% trans "Générer un lien de première connexion" %}
             </button>
         </form>
     </div>

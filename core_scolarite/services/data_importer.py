@@ -19,13 +19,12 @@ insensible à la casse et aux espaces.
 
 from __future__ import annotations
 
-import secrets
 import uuid as uuid_lib
 from datetime import date
 from typing import Literal
 
 from django.contrib.auth.models import User
-from django.core.cache import cache
+from django.core import signing
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from openpyxl import load_workbook
@@ -38,6 +37,7 @@ from accounts.models import (
     Teacher,
     University,
 )
+from accounts.services import matricules
 from core_scolarite.models import Course, CourseAssignment, Enrollment
 
 from .credentials import set_random_password
@@ -46,6 +46,10 @@ Entity = Literal["students", "teachers", "enrollments", "course_assignments"]
 
 # Durée de validité d'un aperçu (le token d'import expire ensuite).
 PREVIEW_TTL_SECONDS = 900
+# Sel de signature du jeton d'aperçu : le rapport est signé côté serveur
+# (SECRET_KEY) et reconduit par le client — aucun état serveur volatile,
+# compatible avec un déploiement multi-workers.
+PREVIEW_SIGNING_SALT = "core_scolarite.import-preview"
 PREVIEW_SAMPLE_SIZE = 50
 
 ENTITY_LABELS: dict[str, str] = {
@@ -185,8 +189,17 @@ def _is_valid_email(value: str) -> bool:
 # --------------------------------------------------------------------------- #
 # Validation ligne à ligne (sans aucune écriture)
 # --------------------------------------------------------------------------- #
-def _validate_users(records, *, strict_placement: bool, university: University):
-    """Valide des comptes étudiants/enseignants ; retourne le rapport."""
+def _validate_users(
+    records, *, strict_placement: bool, university: University, entity: str = "students"
+):
+    """
+    Valide des comptes étudiants/enseignants ; retourne le rapport.
+
+    Contrôles ligne à ligne (brief §2) : champs obligatoires, format d'e-mail,
+    unicité des matricules (fichier + base) et des e-mails (fichier + base),
+    résolution faculté → département **dans l'université cible**, cohérence du
+    matricule avec le format officiel et le code de la faculté.
+    """
     faculties = {
         (faculty.university_id, faculty.name.strip().upper()): faculty
         for faculty in Faculty.objects.filter(university=university)
@@ -199,13 +212,18 @@ def _validate_users(records, *, strict_placement: bool, university: University):
         User.objects.filter(username__in=[r.get("MATRICULE", "") for _, r in records])
         .values_list("username", flat=True)
     )
+    # Unicité des e-mails aussi en base (pas seulement dans le fichier).
+    existing_emails = {
+        (email or "").strip().casefold()
+        for email in User.objects.exclude(email="").values_list("email", flat=True)
+    }
 
     rows, errors, duplicates = [], [], []
     seen_matricules: set[str] = set()
     seen_emails: set[str] = set()
 
     for line_number, record in records:
-        matricule = (record.get("MATRICULE") or "").strip()
+        matricule = (record.get("MATRICULE") or "").strip().upper()
         nom = (record.get("NOM") or "").strip()
         prenom = (record.get("PRENOM") or "").strip()
         email = (record.get("EMAIL") or "").strip()
@@ -230,13 +248,13 @@ def _validate_users(records, *, strict_placement: bool, university: University):
                 is_duplicate = True
                 duplicates.append(
                     {"line": line_number, "identifier": matricule,
-                     "reason": _("Matricule déjà existant.")}
+                     "reason": str(_("Matricule déjà existant."))}
                 )
             elif matricule in seen_matricules:
                 is_duplicate = True
                 duplicates.append(
                     {"line": line_number, "identifier": matricule,
-                     "reason": _("Matricule en doublon dans le fichier.")}
+                     "reason": str(_("Matricule en doublon dans le fichier."))}
                 )
             else:
                 seen_matricules.add(matricule)
@@ -244,6 +262,11 @@ def _validate_users(records, *, strict_placement: bool, university: University):
             key = email.casefold()
             if key in seen_emails:
                 line_errors.append(_("EMAIL en doublon dans le fichier : %(email)s.") % {"email": email})
+            elif key in existing_emails:
+                line_errors.append(
+                    _("EMAIL déjà enregistré sur un autre compte : %(email)s.")
+                    % {"email": email}
+                )
             seen_emails.add(key)
 
         # Résolution hiérarchique faculté → département (université cible).
@@ -273,6 +296,18 @@ def _validate_users(records, *, strict_placement: bool, university: University):
                     )
         elif strict_placement:
             line_errors.append(_("DEPARTEMENT vide."))
+
+        # Matricule : format officiel (CM-UDS-22SCI0001) + cohérence faculté.
+        if matricule and faculty is not None:
+            try:
+                matricule = matricules.validate(
+                    matricule,
+                    entity=entity,
+                    university=university,
+                    faculty=faculty,
+                )
+            except ValueError as exc:
+                line_errors.append(str(exc))
 
         if line_errors:
             errors.append(
@@ -499,11 +534,16 @@ def _validate(entity: str, records, *, strict_placement: bool, university: Unive
     if entity == "students":
         # Mode MVP possible : faculté/département tolérés (profil non onboardé).
         return _validate_users(
-            records, strict_placement=strict_placement, university=university
+            records,
+            strict_placement=strict_placement,
+            university=university,
+            entity=entity,
         )
     if entity == "teachers":
         # Les enseignants exigent toujours un rattachement complet.
-        return _validate_users(records, strict_placement=True, university=university)
+        return _validate_users(
+            records, strict_placement=True, university=university, entity=entity
+        )
     if entity == "enrollments":
         return _validate_enrollments(records, university=university)
     if entity == "course_assignments":
@@ -525,6 +565,9 @@ def _create_users(rows, entity: str) -> int:
             first_name=row["PRENOM"],
             last_name=row["NOM"],
             email=row["EMAIL"],
+            # Compte inactif : l'accès s'ouvre à la première connexion
+            # (lien à usage unique) ou par émission d'accès super-admin.
+            is_active=False,
         )
         # Mot de passe aléatoire non communiqué : jamais de secret prévisible.
         set_random_password(user)
@@ -650,14 +693,17 @@ def preview_import(
         entity, records, strict_placement=strict_placement, university=target
     )
 
-    token = secrets.token_urlsafe(24)
-    payload = {
-        "entity": entity,
-        "university_id": str(target.pk),
-        "created_by": None,
-        "rows": rows,
-    }
-    cache.set(f"import-preview:{token}", payload, PREVIEW_TTL_SECONDS)
+    token = signing.dumps(
+        {
+            "entity": entity,
+            "university_id": str(target.pk),
+            "rows": rows,
+            "errors": errors,
+            "duplicates": duplicates,
+            "total": len(records),
+        },
+        salt=PREVIEW_SIGNING_SALT,
+    )
 
     return {
         "token": token,
@@ -683,18 +729,25 @@ def commit_import(
     university=None,
     actor=None,
     skip_duplicates: bool = False,
+    skip_invalid: bool = False,
 ) -> dict:
     """
     Phase 2 — confirmation d'écriture, après re-validation des données stockées.
 
-    :param token: jeton d'aperçu (durée de vie limitée).
+    :param token: jeton d'aperçu signé (durée de vie limitée).
     :param skip_duplicates: ignorer les lignes en doublon (les autres erreurs
         restent bloquantes).
+    :param skip_invalid: n'enregistrer que les lignes valides — les lignes en
+        erreur ou en doublon sont comptées comme ignorées (contrôle explicite
+        de l'administrateur après consultation du rapport).
     :raises ImportValidationError: aperçu expiré, université différente, ou
         données redevenues invalides (doublons apparus entre-temps).
     """
-    payload = cache.get(f"import-preview:{token}")
-    if not payload:
+    try:
+        payload = signing.loads(
+            token, salt=PREVIEW_SIGNING_SALT, max_age=PREVIEW_TTL_SECONDS
+        )
+    except signing.BadSignature:
         raise ImportValidationError(
             _("Aperçu expiré : rechargez le fichier et refaites la validation.")
         )
@@ -707,14 +760,27 @@ def commit_import(
 
     entity = payload["entity"]
     rows = payload.get("rows") or []
+    preview_errors = payload.get("errors") or []
+    preview_duplicates = payload.get("duplicates") or []
     if not rows:
         raise ImportValidationError(_("Aucune ligne valide à importer."))
+
+    if (preview_errors or preview_duplicates) and not skip_invalid:
+        raise ImportValidationError(
+            _(
+                "%(count)s ligne(s) invalide(s). Corrigez le fichier, ou "
+                "confirmez l'import des seules lignes valides."
+            )
+            % {"count": len(preview_errors) + len(preview_duplicates)},
+            errors=preview_errors,
+            duplicates=preview_duplicates,
+        )
 
     # Rejeu de la validation : l'état de la base a pu changer depuis l'aperçu.
     fresh_rows, errors, duplicates = _revalidate_rows(
         entity, rows, university=target
     )
-    if errors or (duplicates and not skip_duplicates):
+    if not skip_invalid and (errors or (duplicates and not skip_duplicates)):
         raise ImportValidationError(
             _("%(count)s ligne(s) invalide(s). Aucun enregistrement n'a été importé.")
             % {"count": len(errors) + len(duplicates)},
@@ -727,13 +793,17 @@ def commit_import(
 
     if entity in ("students", "teachers"):
         created = _create_users(fresh_rows, entity)
-        result = {"created": created, "skipped": 0}
+        # Lignes écartées : celles déjà signalées à l'aperçu (contrôle explicite
+        # « n'enregistrer que les lignes valides ») + celles devenues invalides.
+        skipped = len(errors) + len(duplicates)
+        if skip_invalid:
+            skipped += len(preview_errors) + len(preview_duplicates)
+        result = {"created": created, "skipped": skipped}
     elif entity == "enrollments":
         result = _create_enrollments(fresh_rows)
     else:
         result = _create_assignments(fresh_rows)
 
-    cache.delete(f"import-preview:{token}")
     return {
         "entity": entity,
         "entity_label": ENTITY_LABELS.get(entity, entity),

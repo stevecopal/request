@@ -9,7 +9,7 @@
 
     <div>
         <label class="label" for="login-matricule">
-            {% trans "Matricule" %} <span class="text-red-600" aria-hidden="true">*</span>
+            {% trans "Matricule ou e-mail" %} <span class="text-red-600" aria-hidden="true">*</span>
         </label>
         <input class="field"
                id="login-matricule"
@@ -20,7 +20,7 @@
                autocapitalize="characters"
                enterkeyhint="next"
                spellcheck="false"
-               placeholder="{% trans 'Ex. ETU001' %}"
+               placeholder="{% trans 'Ex. CM-UDS-25SCI0001' %}"
                required>
        
     </div>
@@ -47,4 +47,15 @@
     <button type="submit" class="btn btn-primary" id="login-submit">
         {% trans "Se connecter" %}
     </button>
+
+    <div class="flex flex-col gap-1 pt-1 text-center text-sm">
+        <a href="{% url 'accounts:activation_request' %}"
+           class="min-h-11 py-2 font-semibold text-navy-light hover:underline">
+            {% trans "Première connexion ? Activez votre compte" %}
+        </a>
+        <a href="{% url 'accounts:reset_request' %}"
+           class="min-h-11 py-2 font-semibold text-navy-light hover:underline">
+            {% trans "Mot de passe oublié" %}
+        </a>
+    </div>
 </form>

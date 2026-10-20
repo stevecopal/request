@@ -103,8 +103,24 @@ def login_view(request):
             attempts=attempts,
         )
 
-    # 3. Authentification stricte : username=matricule (donnée brute, tel quel)
-    user = authenticate(request, username=matricule, password=password)
+    # 3. Authentification stricte : username=matricule (donnée brute, tel quel).
+    # L'utilisateur peut aussi saisir son adresse e-mail (connexions par
+    # matricule **ou** e-mail) : on résout le matricule correspondant.
+    identifier = matricule.strip()
+    if "@" in identifier:
+        from django.contrib.auth.models import User
+
+        resolved = (
+            User.objects.filter(email__iexact=identifier)
+            .values_list("username", flat=True)
+            .first()
+        )
+        if not resolved:
+            _register_failure(request)
+            return _error(_("Matricule ou mot de passe incorrect."), status=401)
+        identifier = resolved
+
+    user = authenticate(request, username=identifier, password=password)
 
     if user is None:
         _register_failure(request)

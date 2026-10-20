@@ -48,8 +48,14 @@ def issue_one_time_password(user: User) -> str:
     """
     Régénère un mot de passe et le retourne **une seule fois** à l'appelant
     (super-admin) : à transmettre hors canal, jamais journalisé.
+
+    L'émission est un acte d'administration explicite : le compte est donc
+    activé (il démarre inactif, l'accès s'ouvrant à la première connexion).
     """
     password = generate_password()
     user.set_password(password)
     user.save(update_fields=["password"])
+    if not user.is_active:
+        user.is_active = True
+        user.save(update_fields=["is_active"])
     return password

@@ -148,12 +148,14 @@
   /* Modale à usage unique (mot de passe affiché une fois)             */
   /* ---------------------------------------------------------------- */
 
-  function showCredential(form, password) {
+  function showCredential(form, value, label) {
     var scope = form.closest("#master-modal") || form.ownerDocument;
     var box = scope.querySelector("[data-credential-box]");
     var code = box && box.querySelector("[data-credential-value]");
+    var caption = box && box.querySelector("[data-credential-label]");
     if (!box || !code) return;
-    code.textContent = password;
+    code.textContent = value;
+    if (caption && label) caption.textContent = label;
     box.classList.remove("hidden");
     box.scrollIntoView({ block: "nearest" });
   }
@@ -166,7 +168,11 @@
     api.showNotification(data.message || "Enregistré.", "success");
 
     if (form.hasAttribute("data-keep-open")) {
-      if (data.password) showCredential(form, data.password);
+      if (data.link) {
+        showCredential(form, data.link, "Lien de première connexion (usage unique)");
+      } else if (data.password) {
+        showCredential(form, data.password, "Mot de passe à usage unique");
+      }
       return;
     }
 

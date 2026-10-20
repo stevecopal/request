@@ -222,24 +222,53 @@
       })
       .join("");
 
-    var files = Array.prototype.map
-      .call(form.querySelectorAll('input[type="file"]'), function (input) {
-        return input.files && input.files.length
-          ? input.files[0].name
-          : null;
-      })
-      .filter(Boolean);
-    if (files.length) {
-      list.insertAdjacentHTML(
-        "beforeend",
-        '<div class="flex justify-between gap-4">' +
-          '<dt class="text-slate-500 shrink-0">Pièces jointes</dt>' +
-          '<dd class="font-medium text-navy-dark text-right">' +
-          escapeHtml(files.join(", ")) +
-          "</dd>" +
-          "</div>"
-      );
-    }
+    // Pièces jointes sélectionnées : nom + aperçu ouvrable dans un nouvel onglet
+    // (le document est consultable avant même l'envoi de la requête).
+    (list.__previewUrls || []).forEach(function (url) {
+      URL.revokeObjectURL(url);
+    });
+    list.__previewUrls = [];
+
+    var files = [];
+    Array.prototype.forEach.call(
+      form.querySelectorAll('input[type="file"]'),
+      function (input) {
+        Array.prototype.forEach.call(input.files || [], function (file) {
+          files.push(file);
+        });
+      }
+    );
+
+    files.forEach(function (file) {
+      var row = document.createElement("div");
+      row.className = "flex items-start justify-between gap-4";
+
+      var term = document.createElement("dt");
+      term.className = "text-slate-500 shrink-0";
+      term.textContent = "Pièce jointe";
+
+      var value = document.createElement("dd");
+      value.className = "font-medium text-navy-dark text-right min-w-0";
+
+      var name = document.createElement("span");
+      name.className = "block truncate";
+      name.textContent = file.name;
+      value.appendChild(name);
+
+      var link = document.createElement("a");
+      var url = URL.createObjectURL(file);
+      list.__previewUrls.push(url);
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.className = "mt-0.5 inline-block text-xs font-semibold text-navy-light hover:underline";
+      link.textContent = "Consulter le document";
+      value.appendChild(link);
+
+      row.appendChild(term);
+      row.appendChild(value);
+      list.appendChild(row);
+    });
 
     list.insertAdjacentHTML(
       "beforeend",

@@ -4,6 +4,10 @@ Routage de l'app accounts — namespace « accounts » (monté à la racine).
 Routes (ARCHITECTURE §7.1) :
   GET  /                        landing
   GET  /login/                  fragment de la modale de connexion
+  GET  /activation/             demande de lien de première connexion
+  GET  /activation/<token>/     définition du mot de passe + activation
+  GET  /mot-de-passe-oublie/    demande de réinitialisation
+  GET  /reinitialisation/<token>/ nouveau mot de passe
   GET  /dashboard/              coque SPA (fragment initial selon le rôle)
   POST /accounts/login/         authentification JSON
   POST /accounts/logout/        déconnexion JSON
@@ -19,7 +23,7 @@ Routes (ARCHITECTURE §7.1) :
 
 from django.urls import path
 
-from .views import ajax_actions, base, notifications
+from .views import access, ajax_actions, base, notifications
 
 app_name = "accounts"
 
@@ -29,6 +33,19 @@ urlpatterns = [
     path("dashboard/", base.dashboard_shell, name="dashboard"),
     path("accounts/login/", ajax_actions.login_view, name="login"),
     path("accounts/logout/", ajax_actions.logout_view, name="logout"),
+    # Première connexion & mot de passe oublié (liens à usage unique).
+    path("activation/", access.activation_request, name="activation_request"),
+    path(
+        "activation/<str:token>/",
+        access.activation_confirm,
+        name="activation_confirm",
+    ),
+    path("mot-de-passe-oublie/", access.reset_request, name="reset_request"),
+    path(
+        "reinitialisation/<str:token>/",
+        access.password_reset_confirm,
+        name="password_reset_confirm",
+    ),
     path("accounts/profile/", base.profile_fragment, name="profile"),
     path(
         "accounts/notifications/",

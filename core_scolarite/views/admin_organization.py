@@ -153,7 +153,10 @@ def _rows(kind: str, university) -> list[dict]:
         }
         if kind == "faculty":
             row["title"] = obj.name
-            row["meta"] = [_("%(n)s départements") % {"n": obj.n_departments}]
+            row["meta"] = [
+                *([obj.code] if obj.code else []),
+                _("%(n)s départements") % {"n": obj.n_departments},
+            ]
         elif kind == "department":
             row["title"] = obj.name
             row["subtitle"] = obj.faculty.name

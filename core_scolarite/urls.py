@@ -4,7 +4,10 @@ Routage de l'app core_scolarite — namespace « core_scolarite ».
   GET  /scolarite/ajax/form-config/       configuration dynamique du formulaire
   GET  /scolarite/ajax/problem-types/     liste des types de problème
   GET  /scolarite/admin/import/           modale d'import (superuser)
-  POST /scolarite/admin/import/upload/    upload ETL (superuser)
+  POST /scolarite/admin/import/preview/   aperçu ETL + rapport ligne à ligne
+  POST /scolarite/admin/import/commit/    confirmation d'écriture (jeton signé)
+  GET  /scolarite/admin/import/template/  modèle CSV/XLSX des en-têtes requis
+  POST /scolarite/admin/import/upload/    import direct (API historique)
   GET  /scolarite/admin/accounts/new/     modale de création manuelle (superuser)
   POST /scolarite/admin/accounts/create/  création manuelle (superuser)
   GET  /scolarite/admin/analytics/        tableau de bord analytique (C0)
@@ -42,6 +45,21 @@ urlpatterns = [
         "admin/import/upload/",
         admin_actions.admin_import_upload,
         name="admin_import_upload",
+    ),
+    path(
+        "admin/import/preview/",
+        admin_actions.admin_import_preview,
+        name="admin_import_preview",
+    ),
+    path(
+        "admin/import/commit/",
+        admin_actions.admin_import_commit,
+        name="admin_import_commit",
+    ),
+    path(
+        "admin/import/template/",
+        admin_actions.admin_import_template,
+        name="admin_import_template",
     ),
     path(
         "admin/accounts/new/",

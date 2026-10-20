@@ -40,7 +40,12 @@
     <div>
         <label class="label" for="manual-matricule">{% trans "Matricule" %}</label>
         <input class="field" id="manual-matricule" name="matricule" type="text"
-               autocapitalize="characters" required>
+               autocapitalize="characters" spellcheck="false"
+               placeholder="{% trans 'Laissez vide pour générer automatiquement' %}"
+               aria-describedby="manual-matricule-hint">
+        <p id="manual-matricule-hint" class="mt-1 text-xs text-slate-500">
+            {% trans "Généré automatiquement au format CM-UDS-25SCI0001 (étudiant) ou CM-UDS-25ENS0001 (enseignant). Un matricule saisi doit respecter ce format." %}
+        </p>
     </div>
 
     <div>

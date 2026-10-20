@@ -20,6 +20,7 @@ from accounts.models import (
     Teacher,
     University,
 )
+from accounts.services import matricules
 
 from .models import (
     AttachmentConfig,
@@ -56,10 +57,24 @@ class ImportForm(forms.Form):
 
 
 class ManualAccountForm(forms.Form):
-    """Création manuelle d'un compte (étudiant ou enseignant) — option A du brief."""
+    """
+    Création manuelle d'un compte (étudiant ou enseignant) — option A du brief.
+
+    Le matricule peut être laissé vide : il est alors généré automatiquement
+    au format officiel (ex. `CM-UDS-25SCI0001` pour un étudiant,
+    `CM-UDS-25ENS0001` pour un enseignant), sans collision possible.
+    """
 
     entity = forms.ChoiceField(label=_("Type de compte"), choices=ENTITY_CHOICES)
-    matricule = forms.CharField(label=_("Matricule"), max_length=50)
+    matricule = forms.CharField(
+        label=_("Matricule"),
+        max_length=50,
+        required=False,
+        help_text=_(
+            "Laissez vide pour générer automatiquement le matricule "
+            "(ex. CM-UDS-25SCI0001)."
+        ),
+    )
     first_name = forms.CharField(label=_("Prénom"), max_length=150)
     last_name = forms.CharField(label=_("Nom"), max_length=150)
     email = forms.EmailField(label=_("Email"))
@@ -88,12 +103,6 @@ class ManualAccountForm(forms.Form):
                 faculty_id=faculty_id, is_active=True
             )
 
-    def clean_matricule(self):
-        matricule = self.cleaned_data["matricule"].strip()
-        if User.objects.filter(username=matricule).exists():
-            raise forms.ValidationError(_("Ce matricule existe déjà."))
-        return matricule
-
     def clean(self):
         cleaned = super().clean()
         entity = cleaned.get("entity")
@@ -105,6 +114,24 @@ class ManualAccountForm(forms.Form):
             )
         if entity == "teachers" and not cleaned.get("title"):
             self.add_error("title", _("Le titre est requis pour un enseignant."))
+
+        # Matricule fourni : format officiel + cohérence faculté/segment.
+        matricule = (cleaned.get("matricule") or "").strip().upper()
+        if matricule and faculty is not None:
+            if User.objects.filter(username=matricule).exists():
+                self.add_error("matricule", _("Ce matricule existe déjà."))
+            else:
+                try:
+                    cleaned["matricule"] = matricules.validate(
+                        matricule,
+                        entity=entity or matricules.ENTITY_STUDENTS,
+                        university=faculty.university,
+                        faculty=faculty,
+                    )
+                except ValueError as exc:
+                    self.add_error("matricule", str(exc))
+        else:
+            cleaned["matricule"] = matricule
         return cleaned
 
 
@@ -153,9 +180,11 @@ class ConsoleFormMixin:
 
 
 class FacultyForm(ConsoleFormMixin, forms.ModelForm):
+    """Faculté : nom + code officiel (compose les matricules, ex. SCI)."""
+
     class Meta:
         model = Faculty
-        fields = ("name",)
+        fields = ("code", "name")
 
     def __init__(self, *args, university=None, **kwargs):
         super().__init__(*args, **kwargs)

@@ -169,6 +169,41 @@ IMPORT_DEFAULT_PASSWORD_PATTERN = config(
     "IMPORT_DEFAULT_PASSWORD_PATTERN", default="{matricule}Univ!{year}"
 )
 
+# --------------------------------------------------------------------------- #
+# Matricules officiels — CM_UDS_22SCI0001 (accounts.services.matricules)
+#   * pays / université : par université (modèle University, console C2)
+#   * code de faculté   : par faculté (modèle Faculty, console C2)
+#   * segment enseignant: configuré ici (format défini séparément)
+# --------------------------------------------------------------------------- #
+TEACHER_MATRICULE_SEGMENT = config("TEACHER_MATRICULE_SEGMENT", default="ENS")
+
+# --------------------------------------------------------------------------- #
+# Première connexion & mot de passe oublié — liens temporaires à usage unique
+# --------------------------------------------------------------------------- #
+ACCESS_LINK_TTL_HOURS = config("ACCESS_LINK_TTL_HOURS", default=48, cast=int)
+RESET_LINK_TTL_HOURS = config("RESET_LINK_TTL_HOURS", default=4, cast=int)
+
+# --------------------------------------------------------------------------- #
+# E-mail transactionnel (liens d'activation / réinitialisation)
+#   DEV  : backend console — les messages, liens compris, sont imprimés.
+#   PROD : SMTP (EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+# --------------------------------------------------------------------------- #
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend"
+    
+)
+EMAIL_HOST = config("EMAIL_HOST", default="localhost")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="UnivReq <no-reply@univreq.local>")
+# Origine canonique utilisée pour rendre **absolus** les liens envoyés par
+# e-mail (première connexion, mot de passe oublié) : ex. http://localhost:8000
+# ou https://univreq.univ-dschang.org. Vide = Host de la requête courante.
+SITE_URL = config("SITE_URL", default="").rstrip("/")
+
 # Feature flag espace enseignant : demande d'informations complémentaires
 # (transition MORE_INFO). Désactivable par environnement sans toucher au code.
 ENABLE_TEACHER_MORE_INFO = config(

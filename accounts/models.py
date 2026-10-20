@@ -20,9 +20,46 @@ from core.models import UUIDModel
 
 
 class University(UUIDModel):
-    """Université — racine de l'arbre académique (isolation multi-tenants)."""
+    """
+    Université — racine de l'arbre académique (isolation multi-tenants).
+
+    `country_code` (ex. « CM » pour le Cameroun) et `code` (ex. « UDS » pour
+    l'Université de Dschang) composent le préfixe officiel des matricules :
+    `CM-UDS-22SCI0001`. Ce sont les deux premiers blocs du matricule et ils
+    sont configurables ici (liste officielle), jamais saisis par l'utilisateur.
+    """
 
     name = models.CharField(_("name"), max_length=150, unique=True)
+    country_code = models.CharField(
+        _("code pays"),
+        max_length=2,
+        default="CM",
+        help_text=_("Deux lettres du pays, ex. CM pour le Cameroun."),
+    )
+    code = models.CharField(
+        _("code université"),
+        max_length=10,
+        default="UDS",
+        help_text=_("Code court officiel, ex. UDS pour l'Université de Dschang."),
+    )
+
+    def clean(self):
+        super().clean()
+        self.country_code = (self.country_code or "").strip().upper()
+        self.code = (self.code or "").strip().upper()
+        if not re.fullmatch(r"[A-Z]{2}", self.country_code):
+            raise ValidationError(
+                {"country_code": _("Code pays invalide : deux lettres attendues, ex. CM.")}
+            )
+        if not re.fullmatch(r"[A-Z0-9]{2,10}", self.code):
+            raise ValidationError(
+                {"code": _("Code université invalide : 2 à 10 caractères alphanumériques.")}
+            )
+
+    def save(self, *args, **kwargs):
+        self.country_code = (self.country_code or "").strip().upper()
+        self.code = (self.code or "").strip().upper()
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("university")
@@ -43,6 +80,18 @@ class Faculty(UUIDModel):
         verbose_name=_("university"),
     )
     name = models.CharField(_("name"), max_length=150)
+    # Code officiel de la faculté (liste configurée par l'administration) :
+    # il compose le matricule étudiant, ex. CM-UDS-22SCI0001 (SCI = Sciences).
+    code = models.CharField(
+        _("code faculté"),
+        max_length=6,
+        blank=True,
+        default="",
+        help_text=_(
+            "Code officiel de la faculté, ex. SCI. Il compose le matricule "
+            "des étudiants (vide = matricules non générables pour cette faculté)."
+        ),
+    )
     # Désactivation douce (C2) : jamais de suppression, l'historique est roi.
     is_active = models.BooleanField(_("actif"), default=True)
 
@@ -55,10 +104,34 @@ class Faculty(UUIDModel):
             models.UniqueConstraint(
                 fields=["university", "name"], name="faculty_university_name_uniq"
             ),
+            # Un code de faculté est unique dans son université (vide = exempt).
+            models.UniqueConstraint(
+                fields=["university", "code"],
+                condition=~models.Q(code=""),
+                name="faculty_university_code_uniq",
+            ),
         ]
         indexes = [
             models.Index(fields=["university", "name"], name="fac_uni_name_idx"),
         ]
+
+    def clean(self):
+        super().clean()
+        code = (self.code or "").strip().upper()
+        self.code = code
+        if code and not re.fullmatch(r"[A-Z0-9]{2,6}", code):
+            raise ValidationError(
+                {
+                    "code": _(
+                        "Code de faculté invalide : 2 à 6 caractères "
+                        "alphanumériques en majuscules, ex. SCI."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.university.name})"
@@ -457,3 +530,67 @@ class Notification(UUIDModel):
 
     def __str__(self):
         return f"Notif({self.user.username}) {self.title[:40]}"
+
+
+class AccessLink(UUIDModel):
+    """
+    Lien temporaire **à usage unique** envoyé par e-mail pour la première
+    connexion (activation du compte) ou la réinitialisation du mot de passe.
+
+    Sécurité :
+      * seul l'empreinte SHA-256 du jeton est stockée (le jeton brut n'existe
+        qu'à la génération et dans l'e-mail) ;
+      * expiration (`expires_at`) et consommation unique (`used_at`) contrôlées
+        côté serveur ;
+      * le jeton est comparé par empreinte, jamais par valeur en clair.
+    """
+
+    class Purpose(models.TextChoices):
+        ACTIVATION = "activation", _("Première connexion")
+        RESET = "reset", _("Réinitialisation du mot de passe")
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="access_links",
+        verbose_name=_("user"),
+    )
+    purpose = models.CharField(
+        _("objet"), max_length=12, choices=Purpose.choices, default=Purpose.ACTIVATION
+    )
+    token_hash = models.CharField(
+        _("empreinte du jeton"), max_length=64, unique=True, editable=False
+    )
+    email = models.EmailField(_("e-mail de destination"))
+    created_at = models.DateTimeField(_("créé le"), auto_now_add=True)
+    expires_at = models.DateTimeField(_("expire le"))
+    used_at = models.DateTimeField(_("utilisé le"), null=True, blank=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("émis par"),
+        help_text=_("Renseigné lorsque l'administrateur émet le lien (procédure contrôlée)."),
+    )
+
+    class Meta:
+        verbose_name = _("lien d'accès")
+        verbose_name_plural = _("liens d'accès")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "purpose"], name="accesslink_user_purpose_idx"),
+        ]
+
+    @property
+    def is_usable(self) -> bool:
+        """True si le lien est intact et encore valide (usage unique + délai)."""
+        from django.utils import timezone
+
+        if self.used_at is not None:
+            return False
+        return self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"AccessLink({self.user.username}, {self.purpose})"
