@@ -15,6 +15,8 @@ une transaction annulée, et le client ne reçoit jamais un statut qui n'existe
 pas encore en base.
 """
 
+import logging
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
@@ -24,8 +26,16 @@ from django.utils.translation import gettext_lazy as _
 
 from tickets.models import Ticket
 
+logger = logging.getLogger(__name__)
+
 
 def _broadcast(user_id, payload):
+    """
+    Diffusion WebSocket **best-effort** : une panne du channel layer (Redis en
+    timeout, redémarrage…) ne doit jamais faire échouer la requête HTTP qui vient
+    d'enregistrer le ticket. L'événement perdu est journalisé, la base reste
+    la source de vérité (l'écran se resynchronise au rechargement).
+    """
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return
@@ -36,10 +46,17 @@ def _broadcast(user_id, payload):
     message["unread_notifications"] = Notification.objects.filter(
         user_id=user_id, is_read=False
     ).count()
-    async_to_sync(channel_layer.group_send)(
-        f"user_{user_id}",
-        {"type": "ticket.status.changed", "message": message},
-    )
+    try:
+        async_to_sync(channel_layer.group_send)(
+            f"user_{user_id}",
+            {"type": "ticket.status.changed", "message": message},
+        )
+    except Exception as exc:  # noqa: BLE001 — best-effort assumé : Redis en
+        # timeout/redémarrage ne doit jamais faire échouer la requête qui vient
+        # d'enregistrer le ticket. La base reste la source de vérité.
+        logger.warning(
+            "Diffusion temps réel impossible (channel layer indisponible) : %r", exc
+        )
 
 
 def _push_notification(user_id, title, body, tag):
@@ -48,7 +65,10 @@ def _push_notification(user_id, title, body, tag):
         from accounts.services.webpush import send_to_user
     except ImportError:
         return
-    send_to_user(user_id, title=title, body=body, tag=tag, url="/dashboard/")
+    try:
+        send_to_user(user_id, title=title, body=body, tag=tag, url="/dashboard/")
+    except Exception:  # noqa: BLE001 — jamais bloquant (best-effort)
+        logger.warning("Envoi push impossible pour l'utilisateur %s", user_id, exc_info=True)
 
 
 def _notification_text(instance, created):

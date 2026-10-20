@@ -105,6 +105,16 @@ services:
     image: redis:7-alpine
     container_name: univreq_redis
     restart: unless-stopped
+    # Plafond mémoire + éviction : sans limites, Redis peut saturer la RAM du
+    # VPS et ne plus répondre (« Timeout reading from redis:6379 » qui ferme
+    # les WebSocket). Les messages temps réel sont jetables, jamais la machine.
+    command: >-
+      redis-server
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    mem_limit: 192mb
     networks:
       - univreq-internal
     healthcheck:

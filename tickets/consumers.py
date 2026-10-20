@@ -14,9 +14,12 @@ Sécurité :
 """
 
 import json
+import logging
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+
+logger = logging.getLogger(__name__)
 
 
 def _has_business_profile(user):
@@ -46,12 +49,30 @@ class TicketConsumer(AsyncWebsocketConsumer):
             return
 
         self.group_name = f"user_{user.id}"
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        self.group_ready = False
+        try:
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+            self.group_ready = True
+        except Exception as exc:  # noqa: BLE001 — panne du channel layer
+            # Channel layer indisponible (Redis en timeout, redémarrage…) :
+            # la socket reste ouverte sans temps réel plutôt que de se fermer
+            # en cascade à chaque reconnexion du client.
+            logger.warning(
+                "WebSocket sans temps réel (channel layer indisponible) "
+                "pour l'utilisateur %s : %s",
+                user.id,
+                exc,
+            )
         await self.accept()
 
     async def disconnect(self, code):
-        if hasattr(self, "group_name"):
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if getattr(self, "group_ready", False):
+            try:
+                await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            except Exception:  # noqa: BLE001 — panne du channel layer
+                logger.warning(
+                    "Départ du groupe temps réel impossible (channel layer hors service)."
+                )
 
     async def receive(self, text_data=None, bytes_data=None, **kwargs):
         """
