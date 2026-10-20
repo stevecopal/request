@@ -40,9 +40,12 @@ x-univreq-env: &univreq-env
   DB_USER: ${DB_USER:-univreq}
   DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant — renseignez-le dans .env}
 
-  # Temps réel (Django Channels) → Redis interne univreq_redis
+  # Temps réel (Django Channels) → Redis interne univreq_redis.
+  # Timeouts courts : si Redis ralentit, l'échec est rapide et journalisé au
+  # lieu de bloquer chaque WebSocket 5 s (voir aussi « redis-cli ping »).
   USE_REDIS_CHANNEL_LAYER: "True"
   REDIS_URL: redis://redis:6379/0
+  REDIS_SOCKET_TIMEOUT: ${REDIS_SOCKET_TIMEOUT:-3}
 
   # Hôtes et HTTPS — TLS terminé par Caddy sur l'hôte ; Django reçoit HTTP
   # derrière le proxy (SECURE_PROXY_SSL_HEADER activé par DEBUG=False).
@@ -50,6 +53,21 @@ x-univreq-env: &univreq-env
   CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?CSRF_TRUSTED_ORIGINS manquant — ex. https://domaine.tld}
   SECURE_COOKIES: "True"
   SECURE_SSL_REDIRECT: "False"
+
+  # E-mail transactionnel — liens de première connexion & mot de passe oublié.
+  # Sans SMTP, Django utilise le backend « console » : le mail est IMPRIMÉ dans
+  # les logs et n'est JAMAIS livré. Renseignez EMAIL_HOST_USER / PASSWORD dans .env
+  # (mot de passe d'application Gmail).
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+  EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  # Expéditeur : vide = EMAIL_HOST_USER (requis par Gmail pour la délivrabilité).
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+  # Origine canonique des liens envoyés par e-mail (URL absolues et cliquables).
+  SITE_URL: ${SITE_URL:-}
 
   # Web Push VAPID (optionnel — sans clés, le push est désactivé proprement)
   VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}

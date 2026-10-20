@@ -118,10 +118,28 @@ else:
 # Temps réel (Django Channels) — InMemory en dev, Redis en prod
 # --------------------------------------------------------------------------- #
 if config("USE_REDIS_CHANNEL_LAYER", default=not DEBUG, cast=bool):
+    # Timeouts courts côté client Redis : si le service ralentit, l'erreur est
+    # levée vite (et journalisée) au lieu de faire attendre chaque WebSocket.
+    _REDIS_TIMEOUT = config("REDIS_SOCKET_TIMEOUT", default=3, cast=float)
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {"hosts": [config("REDIS_URL", default="redis://127.0.0.1:6379/0")]},
+            "CONFIG": {
+                "hosts": [
+                    {
+                        "address": config(
+                            "REDIS_URL", default="redis://127.0.0.1:6379/0"
+                        ),
+                        "socket_connect_timeout": _REDIS_TIMEOUT,
+                        "socket_timeout": _REDIS_TIMEOUT,
+                        "socket_keepalive": True,
+                    }
+                ],
+                # Court mémoire : on préfère perdre un message de notification
+                # plutôt que de saturer Redis.
+                "capacity": 1500,
+                "expiry": 10,
+            },
         }
     }
 else:
@@ -201,8 +219,23 @@ EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="UnivReq <no-reply@univreq.local>")
 # Origine canonique utilisée pour rendre **absolus** les liens envoyés par
 # e-mail (première connexion, mot de passe oublié) : ex. http://localhost:8000
-# ou https://univreq.univ-dschang.org. Vide = Host de la requête courante.
-SITE_URL = config("SITE_URL", default="").rstrip("/")
+# ou https://univreq.cohub.site. Vide = Host de la requête courante.
+# Tolère une liste « a,b » (la dernière valeur prime) pour ne jamais produire
+# un lien e-mail comme https://a,b/activation/… (non cliquable).
+SITE_URL = (
+    [value.strip().rstrip("/") for value in config("SITE_URL", default="").split(",") if value.strip()]
+    or [""]
+)[-1]
+
+# Délivrabilité : avec SMTP, l'expéditeur doit être le compte authentifié
+# (Gmail refuse ou classe en spam tout autre « From »). Si aucun expéditeur
+# explicite n'est fourni, on utilise EMAIL_HOST_USER.
+_PLACEHOLDER_FROM = ("univreq.local", "no-reply@univ.example")
+if EMAIL_HOST_USER and (
+    not DEFAULT_FROM_EMAIL
+    or DEFAULT_FROM_EMAIL.strip().endswith(_PLACEHOLDER_FROM)
+):
+    DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Feature flag espace enseignant : demande d'informations complémentaires
 # (transition MORE_INFO). Désactivable par environnement sans toucher au code.
