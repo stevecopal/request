@@ -15,7 +15,7 @@ from django.shortcuts import redirect, render
 
 from accounts.decorators import login_required_json, student_required
 from accounts.models import Faculty
-from accounts.spa import build_dashboard_context, is_fragment_request, spa_page
+from accounts.spa import is_fragment_request, render_dashboard_shell, spa_page
 from accounts.utils import ROLE_STUDENT, role_name
 from core_scolarite.models import Course, ServiceAssignment
 
@@ -61,9 +61,9 @@ def dashboard_shell(request):
         return redirect("accounts:landing")
 
     _prime_csrf_cookie(request)
-    return render(
-        request, "dashboard/index.html", build_dashboard_context(request)
-    )
+    # Fragment du rôle rendu et inliné côté serveur : affichage immédiat,
+    # sans le fetch initial qui doublait le temps de chargement de la coque.
+    return render_dashboard_shell(request)
 
 
 @spa_page

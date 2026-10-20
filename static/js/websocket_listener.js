@@ -120,8 +120,16 @@
     return Boolean(document.getElementById("spa-config") && document.getElementById("spa-viewport"));
   }
 
+  var RESYNC_MIN_AGE = 30000; // fragment de moins de 30 s = déjà frais
+
   function resyncCurrentView() {
     if (!spaReady()) return;
+    // Un fragment quasi neuf ne doit pas être rechargé : évite le double
+    // chargement à l'entrée sur la coque et le clignotement au retour
+    // d'onglet. Les changements manqués restent couverts par les patches
+    // de cartes du prochain message WS.
+    var loadedAt = api.fragmentLoadedAt || 0;
+    if (Date.now() - loadedAt < RESYNC_MIN_AGE) return;
     api.loadFragment(window.location.pathname + window.location.search, {
       target: "#spa-viewport",
       pushState: false,

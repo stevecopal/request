@@ -1,0 +1,47 @@
+# ══════════════════════════════════════════════════════════════════════════
+# UnivReq — exclusions du contexte et de l'image Docker
+# (image = code + venv gelé ; aucun secret, aucune donnée, aucun artefact
+#  de développement n'y figurent)
+# ══════════════════════════════════════════════════════════════════════════
+
+# Contrôle de version / IDE
+.git
+.gitignore
+.cline*
+.vscode
+.idea
+
+# Environnements Python / Node (reconstruits dans les étages du Dockerfile)
+.venv
+venv
+node_modules
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Artefacts de build locaux — l'image recoit la version compilée par l'étage `assets`
+static/css/output.css
+staticfiles
+
+# Données et secrets — jamais dans l'image
+.env
+.env.*
+!.env.production.example
+db.sqlite3
+*.sqlite3
+media
+logs
+*.log
+
+# Documentation / outillage hors-image
+docs
+design-system
+tools
+_check_pw.py
+_check_pw.py.bak
+README.md
+Dockerfile
+docker-compose.yml

@@ -190,6 +190,9 @@ VAPID_CLAIM_EMAIL = config("VAPID_CLAIM_EMAIL", default="admin@univ.example")
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Cache statique : 1 h par défaut WhiteNoise (60 s) — un ETag reste en
+# place, la revalidation après expiration est donc un simple 304.
+WHITENOISE_MAX_AGE = 3600
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},

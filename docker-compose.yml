@@ -1,0 +1,141 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# UnivReq — Stack Docker de PRODUCTION (PostgreSQL + Redis + Gunicorn/ASGI)
+#
+# Isolation sur VPS multi-apps :
+#   - `name: univreq`  → préfixe automatique des volumes/réseaux du projet ;
+#   - conteneurs nommés univreq_* , réseau interne `univreq-internal` ;
+#   - seul le port 127.0.0.1:8010 est publié → Caddy (hôte) reverse-proxie.
+#
+# Variables lues dans .env à la racine (copier .env.production.example).
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: univreq
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-univreq-app: &univreq-app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: univreq-app:latest
+  restart: unless-stopped
+  logging: *logging
+
+x-univreq-env: &univreq-env
+  DJANGO_SETTINGS_MODULE: core.settings
+  DEBUG: "False"
+
+  # Sécurité — obligatoire (echec explicite si absent)
+  SECRET_KEY: ${SECRET_KEY:?SECRET_KEY manquant — renseignez-le dans .env}
+
+  # PostgreSQL → conteneur dédié univreq_db (jamais l'hôte)
+  DB_ENGINE: postgresql
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_NAME: ${DB_NAME:-univreq}
+  DB_USER: ${DB_USER:-univreq}
+  DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant — renseignez-le dans .env}
+
+  # Temps réel (Django Channels) → Redis interne univreq_redis
+  USE_REDIS_CHANNEL_LAYER: "True"
+  REDIS_URL: redis://redis:6379/0
+
+  # Hôtes et HTTPS — TLS terminé par Caddy sur l'hôte ; Django reçoit HTTP
+  # derrière le proxy (SECURE_PROXY_SSL_HEADER activé par DEBUG=False).
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?ALLOWED_HOSTS manquant — domaine public dans .env}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?CSRF_TRUSTED_ORIGINS manquant — ex. https://domaine.tld}
+  SECURE_COOKIES: "True"
+  SECURE_SSL_REDIRECT: "False"
+
+  # Web Push VAPID (optionnel — sans clés, le push est désactivé proprement)
+  VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+  VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+  VAPID_CLAIM_EMAIL: ${VAPID_CLAIM_EMAIL:-admin@univ.example}
+
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  TZ: ${TZ:-UTC}
+
+services:
+
+  # ── Base de données PostgreSQL dédiée à UnivReq ──────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: univreq_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-univreq}
+      POSTGRES_USER: ${DB_USER:-univreq}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant — renseignez-le dans .env}
+    volumes:
+      - univreq_pgdata:/var/lib/postgresql/data
+    shm_size: 256mb
+    networks:
+      - univreq-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-univreq} -d ${DB_NAME:-univreq}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  # ── Redis (channel layer temps réel — WebSockets) ────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: univreq_redis
+    restart: unless-stopped
+    networks:
+      - univreq-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  # ── Application Django + Gunicorn (worker uvicorn ASGI) ──────────────────
+  web:
+    <<: *univreq-app
+    container_name: univreq_web
+    environment:
+      <<: *univreq-env
+      RUN_MIGRATIONS: "1"
+      RUN_COLLECTSTATIC: "1"
+    ports:
+      # Publishé uniquement sur loopback : seul Caddy (hôte) l'atteint,
+      # aucun conflit de port avec les autres apps du VPS.
+      - "127.0.0.1:${UNIVREQ_HTTP_PORT:-8010}:8000"
+    volumes:
+      - univreq_static:/app/staticfiles
+      - univreq_media:/app/media
+      - univreq_logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - univreq-internal
+    healthcheck:
+      # /manifest.json : page publique légère, sans authentification.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/manifest.json', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging: *logging
+
+networks:
+  univreq-internal:
+    driver: bridge
+
+volumes:
+  univreq_pgdata:
+  univreq_static:
+    name: univreq_static
+  univreq_logs:
+  univreq_media:
+    name: univreq_media

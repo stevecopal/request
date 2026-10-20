@@ -209,6 +209,14 @@
     wire(document);
   });
 
+  // Fragments injectés dans #spa-viewport : recâbler les formulaires de
+  // console injectés par navigation sans rechargement de page.
+  var previousContentHook = api.onContentLoaded;
+  api.onContentLoaded = function (body) {
+    if (typeof previousContentHook === "function") previousContentHook(body);
+    wire(body);
+  };
+
   var previousHook = api.onModalContentLoaded;
   api.onModalContentLoaded = function (body) {
     if (typeof previousHook === "function") previousHook(body);

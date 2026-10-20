@@ -142,11 +142,14 @@
              data-initial-modal-title="{% trans 'Compléter mon profil' %}"{% endif %}></div>
 
         {# -------- Contenu (cible des fragments) -------- #}
+        {# Le fragment initial est inliné côté serveur : affichage immédiat, #}
+        {# sans fetch ni squelette. Le JS ne re-fetch que si l'inlining a    #}
+        {# échoué (attribut data-fragment-inlined absent).                    #}
         <main id="spa-viewport"
               class="app-content"
               tabindex="-1"
-              aria-busy="true">
-            {% include "components/skeleton_list.html" %}
+              {% if initial_fragment_html %}aria-busy="false" data-fragment-inlined="1"{% else %}aria-busy="true"{% endif %}>
+            {% if initial_fragment_html %}{{ initial_fragment_html|safe }}{% else %}{% include "components/skeleton_list.html" %}{% endif %}
         </main>
 
         {# -------- Pied de page simple -------- #}

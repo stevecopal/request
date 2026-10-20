@@ -102,7 +102,12 @@ class TicketHistoryTests(TestCase):
         ticket = self._ticket(Ticket.Status.SENT)
         apply_status(ticket, Ticket.Status.RECEIVED, actor=self.teacher.user)
         apply_status(ticket, Ticket.Status.PROCESSING, actor=self.teacher.user)
-        apply_status(ticket, Ticket.Status.RESOLVED, actor=self.teacher.user)
+        apply_status(
+            ticket,
+            Ticket.Status.RESOLVED,
+            actor=self.teacher.user,
+            reason="Dossier traité et accepté.",
+        )
         history = list(ticket.status_history.order_by("created_at"))
         self.assertEqual(
             [h.to_status for h in history],

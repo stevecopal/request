@@ -62,6 +62,18 @@
     options.credentials = options.credentials || "same-origin";
 
     return fetch(url, options).then(function (response) {
+      // Session expirée / redirection serveur : on quitte proprement le mode
+      // fragment (la page cible s'affiche) au lieu d'injecter un document
+      // complet dans #spa-viewport. Promesse jamais résolue : le navigateur
+      // est en cours de rechargement, aucun toast d'erreur à afficher.
+      if (response.redirected) {
+        window.location.replace(response.url);
+        return new Promise(function () {});
+      }
+      if (response.status === 401) {
+        window.location.replace("/login/");
+        return new Promise(function () {});
+      }
       var contentType = response.headers.get("content-type") || "";
       var isJson = contentType.indexOf("application/json") !== -1;
       var parse = isJson ? response.json() : response.text();
@@ -377,15 +389,33 @@
    *   keepScroll : vrai pour un rafraîchissement silencieux (temps réel,
    *   rechargement de détail après décision) — évite le retour en haut de page.
    */
+  var FRAGMENT_TIMEOUT = 15000;
+
   function loadFragment(url, opts) {
     opts = opts || {};
     var target = document.querySelector(opts.target || "#spa-viewport");
     if (!target) return Promise.resolve();
 
+    // Annule la requête en cours sur cette cible : une réponse lente ne doit
+    // jamais écraser une navigation plus récente (course entre popstate,
+    // rafraîchissements temps réel et clics rapides).
+    if (target.__univreqAbort) target.__univreqAbort.abort();
+    var controller = new AbortController();
+    target.__univreqAbort = controller;
+    var timedOut = false;
+    var timer = window.setTimeout(function () {
+      timedOut = true;
+      controller.abort();
+    }, FRAGMENT_TIMEOUT);
+
+    var previousHtml = target.innerHTML;
     setLoading(target, true);
 
-    return apiFetch(url)
+    return apiFetch(url, { signal: controller.signal })
       .then(function (result) {
+        window.clearTimeout(timer);
+        if (target.__univreqAbort !== controller) return; // requête obsolète
+        target.__univreqAbort = null;
         target.innerHTML = result.data;
         target.setAttribute("aria-busy", "false");
         if (opts.keepScroll !== true) {
@@ -393,21 +423,38 @@
           window.scrollTo(0, 0);
         }
 
-        if (opts.pushState !== false && url !== window.location.pathname) {
+        if (
+          opts.pushState !== false &&
+          url !== window.location.pathname + window.location.search
+        ) {
           history.pushState({ fragment: url }, "", url);
         }
+        window.UnivReq.fragmentLoadedAt = Date.now();
         if (opts.onLoaded) opts.onLoaded(target);
         if (typeof window.UnivReq.onContentLoaded === "function") {
           window.UnivReq.onContentLoaded(target);
         }
       })
       .catch(function (err) {
+        window.clearTimeout(timer);
+        if (target.__univreqAbort !== controller) return; // requête obsolète
+        target.__univreqAbort = null;
         target.setAttribute("aria-busy", "false");
-        target.innerHTML =
-          '<div class="rounded-2xl bg-white border border-slate-100 shadow-sm p-6 text-center">' +
-          '<p class="text-sm font-medium text-navy-dark">' +
-          (err.message || "Une erreur est survenue.") +
-          "</p></div>";
+        if (err && err.name === "AbortError") {
+          // Timeout réseau : on restaure la page précédente plutôt que de
+          // laisser un squelette de chargement éternel.
+          if (timedOut) {
+            target.innerHTML = previousHtml;
+            showNotification(
+              "Le serveur met trop de temps à répondre. Réessayez dans un instant.",
+              "error"
+            );
+          }
+          return;
+        }
+        // On restaure le contenu précédent plutôt qu'une page d'erreur : la
+        // navigation reste utilisable (re-clic = nouvelle tentative).
+        target.innerHTML = previousHtml;
         showNotification(err.message || "Une erreur est survenue.", "error");
       });
   }
@@ -554,8 +601,16 @@
     var config = document.getElementById("spa-config");
     if (!config) return;
 
+    var viewport = document.getElementById("spa-viewport");
+    var inlined = viewport && viewport.getAttribute("data-fragment-inlined") === "1";
     var fragment = config.getAttribute("data-initial-fragment");
-    if (fragment) loadFragment(fragment, { pushState: false });
+    if (inlined) {
+      // Fragment rendu et inliné par le serveur : déjà affiché et câblé au
+      // DOMContentLoaded — aucun fetch initial (zéro aller-retour réseau).
+      window.UnivReq.fragmentLoadedAt = Date.now();
+    } else if (fragment) {
+      loadFragment(fragment, { pushState: false });
+    }
 
     var modal = config.getAttribute("data-initial-modal");
     if (modal) {
