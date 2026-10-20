@@ -67,16 +67,37 @@ class SeedDemoTests(TestCase):
         self.assertEqual(Ticket.objects.count(), 0)
 
     def test_seed_is_idempotent(self):
+        from core_scolarite.management.commands.seed_demo import STUDENTS
+
         self._seed()
         out = self._seed()
         self.assertEqual(University.objects.filter(name="Université de Dschang").count(), 1)
         self.assertEqual(Faculty.objects.count(), 8)
         self.assertEqual(Department.objects.count(), 62)
         self.assertEqual(Course.objects.filter(code="INF101").count(), 1)
-        self.assertEqual(Student.objects.filter(user__username="ETU001").count(), 1)
+        self.assertEqual(Student.objects.filter(user__username=STUDENTS[0][0]).count(), 1)
         self.assertEqual(Enrollment.objects.count(), 29)
         self.assertEqual(Ticket.objects.count(), 0)
         self.assertIn("Jeu de démonstration UDS prêt", out)
+        self.assertIn("vidé puis recréé", out)  # purge systématique : zéro doublon
+
+    def test_seed_uses_official_matricules(self):
+        """Matricules au format CM-UDS-25SCI0001 / CM-UDS-25ENS0001, sans doublon."""
+        import re
+
+        self._seed()
+        students = list(Student.objects.values_list("registration_number", flat=True))
+        teachers = list(Teacher.objects.values_list("user__username", flat=True))
+        self.assertEqual(len(students), len(set(students)))
+        self.assertEqual(len(teachers), len(set(teachers)))
+        self.assertFalse(set(students) & set(teachers))
+        for matricule in students:
+            self.assertRegex(matricule, r"^CM-UDS-\d{2}[A-Z]{3}\d{4}$")
+        for matricule in teachers:
+            self.assertRegex(matricule, r"^CM-UDS-\d{2}ENS\d{4}$")
+        # Codes de faculté attribués (liste officielle).
+        self.assertEqual(Faculty.objects.filter(code="").count(), 0)
+        self.assertTrue(Faculty.objects.filter(code="SCI").exists())
 
     def test_seed_purges_legacy_demo_university(self):
         from django.contrib.auth.models import User
@@ -87,13 +108,13 @@ class SeedDemoTests(TestCase):
         legacy = Uni.objects.get(name="Université Nationale")
         faculty = Faculty.objects.create(university=legacy, name="Faculté des Sciences")
         dept = Department.objects.create(faculty=faculty, name="Informatique")
-        teacher_user = User.objects.create_user(username="ENS001", password="x")
+        teacher_user = User.objects.create_user(username="ANS001", password="x")
         teacher = Teacher.objects.create(
             user=teacher_user, title="DR", faculty=faculty, department=dept
         )
-        student_user = User.objects.create_user(username="ETU001", password="x")
+        student_user = User.objects.create_user(username="ATU001", password="x")
         student = Student.objects.create(
-            user=student_user, registration_number="ETU001",
+            user=student_user, registration_number="ATU001",
             faculty=faculty, department=dept,
         )
         course = Course.objects.create(code="INF101", name="Ancien programme", department=dept)
@@ -111,9 +132,8 @@ class SeedDemoTests(TestCase):
             Course.objects.get(code="INF101").department.faculty.university.name,
             "Université de Dschang",
         )
-        # Les comptes sont conservés, les profils reconstruits sous l'UDS.
-        self.assertTrue(User.objects.filter(username="ETU001").exists())
-        student = Student.objects.get(user__username="ETU001")
-        self.assertEqual(student.faculty.university.name, "Université de Dschang")
-        teacher = Teacher.objects.get(user__username="ENS001")
-        self.assertEqual(teacher.faculty.university.name, "Université de Dschang")
+        # Les anciens comptes de démo n'ont plus aucun profil (le jeu est
+        # entièrement régénéré avec les matricules officiels).
+        self.assertTrue(User.objects.filter(username="ATU001").exists())
+        self.assertEqual(Student.objects.filter(user__username="ATU001").count(), 0)
+        self.assertEqual(Teacher.objects.filter(user__username="ANS001").count(), 0)

@@ -5,8 +5,16 @@ Reproduit la structure réelle de l'Université de Dschang : 8 établissements,
 62 départements, programmes, UE, enseignants, étudiants, inscriptions,
 services administratifs et types de problème du formulaire dynamique.
 
-Idempotente (réexécutable sans doublon) et purge l'ancien jeu « Université
-Nationale » le cas échéant. Aucun ticket de démonstration n'est créé.
+Matricules **au format officiel** (accounts.services.matricules) :
+  * étudiant   : `CM-UDS-25SCI0001` (code de faculté + numéro d'ordre)
+  * enseignant : `CM-UDS-25ENS0001` (segment enseignant configuré)
+Les codes de faculté (liste officielle) sont attribués à chaque établissement.
+
+Idempotent **et sans doublon** : à chaque chargement, l'ancien jeu UDS est
+purgé (tickets, comptes de démo, profils, UE, programmes, services, types de
+problème, facultés/départements) puis entièrement recréé. L'ancien jeu
+« Université Nationale » est purgé lui aussi. Aucun ticket de démonstration
+n'est créé.
 
 Usage : uv run python manage.py seed_demo
 """
@@ -28,9 +36,11 @@ from accounts.models import (
     Teacher,
     University,
 )
+from accounts.services import matricules
 from core_scolarite.models import (
     AttachmentConfig,
     Course,
+    CourseAssignment,
     Enrollment,
     ProblemType,
     Service,
@@ -41,6 +51,28 @@ from tickets.models import Ticket
 DEFAULT_UNIVERSITY = "Université de Dschang"
 LEGACY_UNIVERSITY = "Université Nationale"
 ACADEMIC_YEAR = "2025-2026"
+
+# Codes officiels des établissements (liste configurée — console C2).
+FACULTY_CODES = {
+    "Faculté des Lettres et Sciences Humaines": "LSH",
+    "Faculté des Sciences Économiques et de Gestion": "SEG",
+    "Faculté des Sciences Juridiques et Politiques": "SJP",
+    "Faculté des Sciences": "SCI",
+    "Faculté d'Agronomie et des Sciences Agricoles": "ASA",
+    "Faculté de Médecine et des Sciences Pharmaceutiques": "MSP",
+    "Institut Universitaire de Technologie Fotso Victor de Bandjoun": "IUT",
+    "Institut des Beaux-Arts de Foumban": "IBA",
+}
+
+# Année d'inscription codée dans les matricules du jeu (année académique
+# courante du seed). Blocs : pays CM, université UDS, année 25.
+YEAR_BLOCK = "25"
+
+
+def M(segment: str, number: int) -> str:
+    """Matricule officiel du jeu : M("SCI", 1) → « CM-UDS-25SCI0001 »."""
+    return f"CM-UDS-{YEAR_BLOCK}{segment}{number:04d}"
+
 
 # (établissement, [départements]) — source : univ-dschang.org (8 établissements)
 STRUCTURE = [
@@ -151,89 +183,89 @@ STRUCTURE = [
 # (matricule, titre, prénom, nom, département)
 TEACHERS = [
     # Faculté des Sciences
-    ("ENS001", "DR", "Paul", "Ndongo", "Mathématiques-Informatique"),
-    ("ENS002", "PR", "Claire", "Mbala", "Mathématiques-Informatique"),
-    ("ENS003", "MR", "Serge", "Kamdem", "Physique"),
-    ("ENS004", "DR", "Alice", "Foka", "Chimie"),
-    ("ENS005", "PR", "Jeanne", "Etoundi", "Biologie Animale"),
-    ("ENS006", "MR", "Robert", "Njoya", "Sciences de la Terre"),
-    ("ENS007", "DR", "Esther", "Bella", "Biochimie"),
-    ("ENS008", "MR", "Samuel", "Ateba", "Biologie Végétale"),
+    (M("ENS", 1), "DR", "Paul", "Ndongo", "Mathématiques-Informatique"),
+    (M("ENS", 2), "PR", "Claire", "Mbala", "Mathématiques-Informatique"),
+    (M("ENS", 3), "MR", "Serge", "Kamdem", "Physique"),
+    (M("ENS", 4), "DR", "Alice", "Foka", "Chimie"),
+    (M("ENS", 5), "PR", "Jeanne", "Etoundi", "Biologie Animale"),
+    (M("ENS", 6), "MR", "Robert", "Njoya", "Sciences de la Terre"),
+    (M("ENS", 7), "DR", "Esther", "Bella", "Biochimie"),
+    (M("ENS", 8), "MR", "Samuel", "Ateba", "Biologie Végétale"),
     # Faculté des Sciences Juridiques et Politiques
-    ("ENS009", "DR", "Ngo", "Bilie", "Droit privé fondamental"),
-    ("ENS010", "PR", "Marie", "Tchouta", "Droit public"),
-    ("ENS011", "DR", "Henri", "Owona", "Sciences politiques"),
-    ("ENS012", "MR", "Alain", "Sedjo", "Droit des affaires et de l'entreprise"),
+    (M("ENS", 9), "DR", "Ngo", "Bilie", "Droit privé fondamental"),
+    (M("ENS", 10), "PR", "Marie", "Tchouta", "Droit public"),
+    (M("ENS", 11), "DR", "Henri", "Owona", "Sciences politiques"),
+    (M("ENS", 12), "MR", "Alain", "Sedjo", "Droit des affaires et de l'entreprise"),
     # Faculté des Sciences Économiques et de Gestion
-    ("ENS013", "DR", "Sophie", "Abena", "Analyse et Politiques Économiques"),
-    ("ENS014", "MR", "Patrick", "Nkoulou", "Finance et Comptabilité"),
-    ("ENS015", "MME", "Catherine", "Mvondo", "Marketing et Management"),
-    ("ENS016", "DR", "Alphonse", "Djomo", "Économie du Développement"),
-    ("ENS017", "MME", "Patrickine", "Beyeme", "Entrepreneuriat et Innovation"),
+    (M("ENS", 13), "DR", "Sophie", "Abena", "Analyse et Politiques Économiques"),
+    (M("ENS", 14), "MR", "Patrick", "Nkoulou", "Finance et Comptabilité"),
+    (M("ENS", 15), "MME", "Catherine", "Mvondo", "Marketing et Management"),
+    (M("ENS", 16), "DR", "Alphonse", "Djomo", "Économie du Développement"),
+    (M("ENS", 17), "MME", "Patrickine", "Beyeme", "Entrepreneuriat et Innovation"),
     # Faculté des Lettres et Sciences Humaines
-    ("ENS018", "MME", "Bernadette", "Essomba", "Histoire et Archéologie"),
-    ("ENS019", "DR", "Ivan", "Kuate", "Langues Étrangères Appliquées"),
-    ("ENS020", "MME", "Ruth", "Ndam", "Géographie, Aménagement et Environnement"),
-    ("ENS021", "MR", "Joseph", "Asong", "Sociologie"),
-    ("ENS022", "MME", "Clarisse", "Nana", "Sciences et Techniques de l'Information et de la Communication"),
+    (M("ENS", 18), "MME", "Bernadette", "Essomba", "Histoire et Archéologie"),
+    (M("ENS", 19), "DR", "Ivan", "Kuate", "Langues Étrangères Appliquées"),
+    (M("ENS", 20), "MME", "Ruth", "Ndam", "Géographie, Aménagement et Environnement"),
+    (M("ENS", 21), "MR", "Joseph", "Asong", "Sociologie"),
+    (M("ENS", 22), "MME", "Clarisse", "Nana", "Sciences et Techniques de l'Information et de la Communication"),
     # Faculté d'Agronomie et des Sciences Agricoles
-    ("ENS023", "PR", "Salomon", "Talla", "Agriculture"),
-    ("ENS024", "MME", "Véronique", "Ndasi", "Zootechnie"),
-    ("ENS025", "MR", "Emmanuel", "Fru", "Génie Rural"),
-    ("ENS026", "MME", "Léonie", "Tchoupo", "Sciences du Sol"),
+    (M("ENS", 23), "PR", "Salomon", "Talla", "Agriculture"),
+    (M("ENS", 24), "MME", "Véronique", "Ndasi", "Zootechnie"),
+    (M("ENS", 25), "MR", "Emmanuel", "Fru", "Génie Rural"),
+    (M("ENS", 26), "MME", "Léonie", "Tchoupo", "Sciences du Sol"),
     # Faculté de Médecine et des Sciences Pharmaceutiques
-    ("ENS027", "DR", "Che", "Gibert", "Morphological Sciences, Pathological Anatomy and Legal Medicine"),
-    ("ENS028", "PR", "Nadège", "Fouda", "Pharmaceutical Sciences"),
+    (M("ENS", 27), "DR", "Che", "Gibert", "Morphological Sciences, Pathological Anatomy and Legal Medicine"),
+    (M("ENS", 28), "PR", "Nadège", "Fouda", "Pharmaceutical Sciences"),
     # IUT Fotso Victor
-    ("ENS029", "MR", "Bruno", "Kamga", "Génie Informatique"),
+    (M("ENS", 29), "MR", "Bruno", "Kamga", "Génie Informatique"),
     # Institut des Beaux-Arts
-    ("ENS030", "MME", "Solange", "Kouam", "Arts Plastiques et Histoire de l'Art"),
+    (M("ENS", 30), "MME", "Solange", "Kouam", "Arts Plastiques et Histoire de l'Art"),
 ]
 
 # (code, nom, département, matricule enseignant)
 COURSES = [
     # Faculté des Sciences — Mathématiques-Informatique
-    ("INF101", "Introduction à l'algorithmique", "Mathématiques-Informatique", "ENS001"),
-    ("INF102", "Programmation orientée objet", "Mathématiques-Informatique", "ENS002"),
-    ("INF201", "Structures de données et algorithmes", "Mathématiques-Informatique", "ENS002"),
-    ("MAT111", "Analyse différentielle", "Mathématiques-Informatique", "ENS001"),
-    ("MAT121", "Algèbre linéaire", "Mathématiques-Informatique", "ENS001"),
-    ("PHY101", "Mécanique générale", "Physique", "ENS003"),
-    ("CHI101", "Chimie générale", "Chimie", "ENS004"),
-    ("BIO101", "Zoologie générale", "Biologie Animale", "ENS005"),
-    ("BCH101", "Biochimie générale", "Biochimie", "ENS007"),
-    ("BVE101", "Botanique générale", "Biologie Végétale", "ENS008"),
-    ("STE101", "Géologie générale", "Sciences de la Terre", "ENS006"),
+    ("INF101", "Introduction à l'algorithmique", "Mathématiques-Informatique", M("ENS", 1)),
+    ("INF102", "Programmation orientée objet", "Mathématiques-Informatique", M("ENS", 2)),
+    ("INF201", "Structures de données et algorithmes", "Mathématiques-Informatique", M("ENS", 2)),
+    ("MAT111", "Analyse différentielle", "Mathématiques-Informatique", M("ENS", 1)),
+    ("MAT121", "Algèbre linéaire", "Mathématiques-Informatique", M("ENS", 1)),
+    ("PHY101", "Mécanique générale", "Physique", M("ENS", 3)),
+    ("CHI101", "Chimie générale", "Chimie", M("ENS", 4)),
+    ("BIO101", "Zoologie générale", "Biologie Animale", M("ENS", 5)),
+    ("BCH101", "Biochimie générale", "Biochimie", M("ENS", 7)),
+    ("BVE101", "Botanique générale", "Biologie Végétale", M("ENS", 8)),
+    ("STE101", "Géologie générale", "Sciences de la Terre", M("ENS", 6)),
     # Faculté des Sciences Juridiques et Politiques
-    ("DRO101", "Introduction au droit privé", "Droit privé fondamental", "ENS009"),
-    ("DRO102", "Droit public", "Droit public", "ENS010"),
-    ("DRO201", "Droit des affaires", "Droit des affaires et de l'entreprise", "ENS012"),
-    ("POL101", "Introduction aux sciences politiques", "Sciences politiques", "ENS011"),
+    ("DRO101", "Introduction au droit privé", "Droit privé fondamental", M("ENS", 9)),
+    ("DRO102", "Droit public", "Droit public", M("ENS", 10)),
+    ("DRO201", "Droit des affaires", "Droit des affaires et de l'entreprise", M("ENS", 12)),
+    ("POL101", "Introduction aux sciences politiques", "Sciences politiques", M("ENS", 11)),
     # Faculté des Sciences Économiques et de Gestion
-    ("ECO101", "Microéconomie", "Analyse et Politiques Économiques", "ENS013"),
-    ("ECO111", "Économie du développement", "Économie du Développement", "ENS016"),
-    ("GES101", "Principes de gestion", "Finance et Comptabilité", "ENS014"),
-    ("GES121", "Comptabilité générale", "Finance et Comptabilité", "ENS014"),
-    ("GES131", "Marketing fondamental", "Marketing et Management", "ENS015"),
-    ("GES141", "Entrepreneuriat et innovation", "Entrepreneuriat et Innovation", "ENS017"),
+    ("ECO101", "Microéconomie", "Analyse et Politiques Économiques", M("ENS", 13)),
+    ("ECO111", "Économie du développement", "Économie du Développement", M("ENS", 16)),
+    ("GES101", "Principes de gestion", "Finance et Comptabilité", M("ENS", 14)),
+    ("GES121", "Comptabilité générale", "Finance et Comptabilité", M("ENS", 14)),
+    ("GES131", "Marketing fondamental", "Marketing et Management", M("ENS", 15)),
+    ("GES141", "Entrepreneuriat et innovation", "Entrepreneuriat et Innovation", M("ENS", 17)),
     # Faculté des Lettres et Sciences Humaines
-    ("HIS101", "Histoire du Cameroun", "Histoire et Archéologie", "ENS018"),
-    ("ANG101", "Anglais général", "Langues Étrangères Appliquées", "ENS019"),
-    ("GEO121", "Géographie du développement", "Géographie, Aménagement et Environnement", "ENS020"),
-    ("SOC101", "Introduction à la sociologie", "Sociologie", "ENS021"),
-    ("COM101", "Introduction aux sciences de l'information", "Sciences et Techniques de l'Information et de la Communication", "ENS022"),
+    ("HIS101", "Histoire du Cameroun", "Histoire et Archéologie", M("ENS", 18)),
+    ("ANG101", "Anglais général", "Langues Étrangères Appliquées", M("ENS", 19)),
+    ("GEO121", "Géographie du développement", "Géographie, Aménagement et Environnement", M("ENS", 20)),
+    ("SOC101", "Introduction à la sociologie", "Sociologie", M("ENS", 21)),
+    ("COM101", "Introduction aux sciences de l'information", "Sciences et Techniques de l'Information et de la Communication", M("ENS", 22)),
     # Faculté d'Agronomie et des Sciences Agricoles
-    ("AGR101", "Agronomie tropicale", "Agriculture", "ENS023"),
-    ("ZOO101", "Zootechnie générale", "Zootechnie", "ENS024"),
-    ("RUR101", "Génie rural : eau et énergie", "Génie Rural", "ENS025"),
-    ("SAI101", "Sciences du sol générales", "Sciences du Sol", "ENS026"),
+    ("AGR101", "Agronomie tropicale", "Agriculture", M("ENS", 23)),
+    ("ZOO101", "Zootechnie générale", "Zootechnie", M("ENS", 24)),
+    ("RUR101", "Génie rural : eau et énergie", "Génie Rural", M("ENS", 25)),
+    ("SAI101", "Sciences du sol générales", "Sciences du Sol", M("ENS", 26)),
     # Faculté de Médecine et des Sciences Pharmaceutiques
-    ("ANA101", "Anatomie générale", "Morphological Sciences, Pathological Anatomy and Legal Medicine", "ENS027"),
-    ("PHA101", "Chimie pharmaceutique", "Pharmaceutical Sciences", "ENS028"),
+    ("ANA101", "Anatomie générale", "Morphological Sciences, Pathological Anatomy and Legal Medicine", M("ENS", 27)),
+    ("PHA101", "Chimie pharmaceutique", "Pharmaceutical Sciences", M("ENS", 28)),
     # IUT Fotso Victor
-    ("IUT101", "Programmation et réseaux", "Génie Informatique", "ENS029"),
+    ("IUT101", "Programmation et réseaux", "Génie Informatique", M("ENS", 29)),
     # Institut des Beaux-Arts
-    ("ART101", "Histoire de l'art", "Arts Plastiques et Histoire de l'Art", "ENS030"),
+    ("ART101", "Histoire de l'art", "Arts Plastiques et Histoire de l'Art", M("ENS", 30)),
 ]
 
 # (département, code programme, intitulé) — licence, pour les départements
@@ -254,51 +286,51 @@ PROGRAMS = [
 
 # (matricule, prénom, nom, email, département)
 STUDENTS = [
-    ("ETU001", "Alice", "Kamga", "alice.kamga@univ-dschang.org", "Mathématiques-Informatique"),
-    ("ETU002", "Brice", "Tchoumi", "brice.tchoumi@univ-dschang.org", "Mathématiques-Informatique"),
-    ("ETU003", "Chantal", "Eyenga", "chantal.eyenga@univ-dschang.org", "Physique"),
-    ("ETU004", "David", "Nkongho", "david.nkongho@univ-dschang.org", "Droit privé fondamental"),
-    ("ETU005", "Estelle", "Mbarga", "estelle.mbarga@univ-dschang.org", "Droit public"),
-    ("ETU006", "Franck", "Atemengue", "franck.atemengue@univ-dschang.org", "Finance et Comptabilité"),
-    ("ETU007", "Grâce", "Oyono", "grace.oyono@univ-dschang.org", "Marketing et Management"),
-    ("ETU008", "Hervé", "Sipa", "herve.sipa@univ-dschang.org", "Analyse et Politiques Économiques"),
-    ("ETU009", "Inès", "Zebaze", "ines.zebaze@univ-dschang.org", "Histoire et Archéologie"),
-    ("ETU010", "Junior", "Belibi", "junior.belibi@univ-dschang.org", "Langues Étrangères Appliquées"),
-    ("ETU011", "Karelle", "Ndongo", "karelle.ndongo@univ-dschang.org", "Agriculture"),
-    ("ETU012", "Loïc", "Mballa", "loic.mballa@univ-dschang.org", "Sciences du Sol"),
+    (M("SCI", 1), "Alice", "Kamga", "alice.kamga@univ-dschang.org", "Mathématiques-Informatique"),
+    (M("SCI", 2), "Brice", "Tchoumi", "brice.tchoumi@univ-dschang.org", "Mathématiques-Informatique"),
+    (M("SCI", 3), "Chantal", "Eyenga", "chantal.eyenga@univ-dschang.org", "Physique"),
+    (M("SJP", 4), "David", "Nkongho", "david.nkongho@univ-dschang.org", "Droit privé fondamental"),
+    (M("SJP", 5), "Estelle", "Mbarga", "estelle.mbarga@univ-dschang.org", "Droit public"),
+    (M("SEG", 6), "Franck", "Atemengue", "franck.atemengue@univ-dschang.org", "Finance et Comptabilité"),
+    (M("SEG", 7), "Grâce", "Oyono", "grace.oyono@univ-dschang.org", "Marketing et Management"),
+    (M("SEG", 8), "Hervé", "Sipa", "herve.sipa@univ-dschang.org", "Analyse et Politiques Économiques"),
+    (M("LSH", 9), "Inès", "Zebaze", "ines.zebaze@univ-dschang.org", "Histoire et Archéologie"),
+    (M("LSH", 10), "Junior", "Belibi", "junior.belibi@univ-dschang.org", "Langues Étrangères Appliquées"),
+    (M("ASA", 11), "Karelle", "Ndongo", "karelle.ndongo@univ-dschang.org", "Agriculture"),
+    (M("ASA", 12), "Loïc", "Mballa", "loic.mballa@univ-dschang.org", "Sciences du Sol"),
 ]
 
 # (matricule étudiant, code UE) — inscription en ACADEMIC_YEAR
 ENROLLMENTS = [
-    ("ETU001", "INF101"),
-    ("ETU001", "INF102"),
-    ("ETU001", "MAT111"),
-    ("ETU001", "MAT121"),
-    ("ETU002", "INF101"),
-    ("ETU002", "INF102"),
-    ("ETU002", "INF201"),
-    ("ETU003", "PHY101"),
-    ("ETU003", "MAT111"),
-    ("ETU004", "DRO101"),
-    ("ETU004", "DRO102"),
-    ("ETU005", "DRO102"),
-    ("ETU005", "POL101"),
-    ("ETU006", "GES101"),
-    ("ETU006", "GES121"),
-    ("ETU006", "GES131"),
-    ("ETU007", "GES131"),
-    ("ETU007", "GES101"),
-    ("ETU008", "ECO101"),
-    ("ETU008", "ECO111"),
-    ("ETU008", "GES101"),
-    ("ETU009", "HIS101"),
-    ("ETU009", "ANG101"),
-    ("ETU010", "ANG101"),
-    ("ETU010", "COM101"),
-    ("ETU011", "AGR101"),
-    ("ETU011", "ZOO101"),
-    ("ETU012", "AGR101"),
-    ("ETU012", "SAI101"),
+    (M("SCI", 1), "INF101"),
+    (M("SCI", 1), "INF102"),
+    (M("SCI", 1), "MAT111"),
+    (M("SCI", 1), "MAT121"),
+    (M("SCI", 2), "INF101"),
+    (M("SCI", 2), "INF102"),
+    (M("SCI", 2), "INF201"),
+    (M("SCI", 3), "PHY101"),
+    (M("SCI", 3), "MAT111"),
+    (M("SJP", 4), "DRO101"),
+    (M("SJP", 4), "DRO102"),
+    (M("SJP", 5), "DRO102"),
+    (M("SJP", 5), "POL101"),
+    (M("SEG", 6), "GES101"),
+    (M("SEG", 6), "GES121"),
+    (M("SEG", 6), "GES131"),
+    (M("SEG", 7), "GES131"),
+    (M("SEG", 7), "GES101"),
+    (M("SEG", 8), "ECO101"),
+    (M("SEG", 8), "ECO111"),
+    (M("SEG", 8), "GES101"),
+    (M("LSH", 9), "HIS101"),
+    (M("LSH", 9), "ANG101"),
+    (M("LSH", 10), "ANG101"),
+    (M("LSH", 10), "COM101"),
+    (M("ASA", 11), "AGR101"),
+    (M("ASA", 11), "ZOO101"),
+    (M("ASA", 12), "AGR101"),
+    (M("ASA", 12), "SAI101"),
 ]
 
 # (nom, description, email de contact)
@@ -322,9 +354,9 @@ SERVICES = [
 
 # (service, coordonnateur, [membres]) — matricules d'enseignants
 SERVICE_ASSIGNMENTS = [
-    ("Service des examens et notes", "ENS001", ["ENS002", "ENS013"]),
-    ("Scolarité et inscriptions", "ENS018", ["ENS010", "ENS019"]),
-    ("Systèmes d'information", "ENS029", ["ENS001"]),
+    ("Service des examens et notes", M("ENS", 1), [M("ENS", 2), M("ENS", 13)]),
+    ("Scolarité et inscriptions", M("ENS", 18), [M("ENS", 10), M("ENS", 19)]),
+    ("Systèmes d'information", M("ENS", 29), [M("ENS", 1)]),
 ]
 
 # (nom, requires_course, description, service, [(libellé pièce, obligatoire)])
@@ -392,7 +424,8 @@ class Command(BaseCommand):
         def temp_password(matricule):
             return pattern.format(matricule=matricule, year=year)
 
-        purged = self._purge_legacy()
+        purged_legacy = self._purge_legacy()
+        purged_demo = self._purge_demo()
 
         # ── Année académique courante ────────────────────────────────────
         ay, _ = AcademicYear.objects.get_or_create(
@@ -407,12 +440,24 @@ class Command(BaseCommand):
             ay.save()
 
         # ── Université, établissements, départements ─────────────────────
-        university, _ = University.objects.get_or_create(name=DEFAULT_UNIVERSITY)
+        university, _ = University.objects.get_or_create(
+            name=DEFAULT_UNIVERSITY,
+            defaults={"country_code": "CM", "code": "UDS"},
+        )
+        if university.country_code != "CM" or university.code != "UDS":
+            university.country_code, university.code = "CM", "UDS"
+            university.save(update_fields=["country_code", "code"])
+
         departments = {}
         for faculty_name, dept_names in STRUCTURE:
+            # Code officiel de l'établissement (liste configurée, console C2).
+            code = FACULTY_CODES.get(faculty_name, "")
             faculty, _ = Faculty.objects.get_or_create(
-                university=university, name=faculty_name
+                university=university, name=faculty_name, defaults={"code": code}
             )
+            if faculty.code != code:  # aligne la liste officielle à chaque run
+                faculty.code = code
+                faculty.save(update_fields=["code"])
             for dept_name in dept_names:
                 dept, _ = Department.objects.get_or_create(
                     faculty=faculty, name=dept_name
@@ -430,6 +475,7 @@ class Command(BaseCommand):
             services[name] = service
 
         # ── Enseignants ──────────────────────────────────────────────────
+        # Matricules officiels (CM-UDS-25ENS0001) définis dans TEACHERS.
         teachers = {}
         for matricule, title, first, last, dept_name in TEACHERS:
             dept = departments[dept_name]
@@ -479,15 +525,16 @@ class Command(BaseCommand):
             courses[code] = course
 
         # ── Étudiants & affectations programmes ──────────────────────────
+        # Matricules officiels (CM-UDS-25SCI0001) définis dans STUDENTS.
         students = {}
         for matricule, first, last, email, dept_name in STUDENTS:
+            dept = departments[dept_name]
             user, _ = User.objects.get_or_create(
                 username=matricule,
                 defaults={"first_name": first, "last_name": last, "email": email},
             )
             user.set_password(temp_password(matricule))
             user.save()
-            dept = departments[dept_name]
             student, _ = Student.objects.get_or_create(
                 user=user,
                 defaults={
@@ -575,8 +622,27 @@ class Command(BaseCommand):
             admin_user.save()
 
         # ── Bilan ────────────────────────────────────────────────────────
-        if purged:
+        # Contrôle de cohérence : chaque matricule du jeu respecte le format
+        # officiel (pays-université-année-segment-numéro).
+        for matricule, _first, _last, _email, dept_name in STUDENTS:
+            matricules.validate(
+                matricule,
+                entity="students",
+                university=university,
+                faculty=departments[dept_name].faculty,
+            )
+        for teacher_row in TEACHERS:
+            matricules.validate(
+                teacher_row[0], entity="teachers", university=university
+            )
+
+        if purged_legacy:
             self.stdout.write(f"Ancien jeu « {LEGACY_UNIVERSITY} » purgé.")
+        if purged_demo:
+            self.stdout.write(
+                f"Jeu précédent « {DEFAULT_UNIVERSITY} » vidé puis recréé "
+                "(aucun doublon au chargement)."
+            )
         self.stdout.write(
             self.style.SUCCESS(
                 f"Jeu de démonstration UDS prêt : {len(STRUCTURE)} établissements, "
@@ -587,11 +653,89 @@ class Command(BaseCommand):
             )
         )
         self.stdout.write(
-            "Comptes (mot de passe = règle IMPORT_DEFAULT_PASSWORD_PATTERN) :\n"
-            "  étudiants    ETU001 → ETU012\n"
-            "  enseignants  ENS001 → ENS030\n"
-            "  super-admin  ADMIN001"
+            "Comptes générés au format officiel "
+            "(jeu de démo : mot de passe = règle IMPORT_DEFAULT_PASSWORD_PATTERN ; "
+            "en production, les comptes créés démarrent inactifs et s'activent "
+            "par lien de première connexion) :\n"
+            "  super-admin  ADMIN001\n"
+            f"  étudiants    {STUDENTS[0][0]} → {STUDENTS[-1][0]} ({len(STUDENTS)})\n"
+            f"  enseignants  {TEACHERS[0][0]} → {TEACHERS[-1][0]} ({len(TEACHERS)})"
         )
+
+    def _purge_demo(self) -> bool:
+        """
+        Vide le jeu de démonstration UDS avant régénération.
+
+        Objectif « aucun doublon au chargement » : à chaque exécution, le jeu
+        complet (tickets, inscriptions, affectations, enseignants, étudiants,
+        UE, programmes, services, types de problème, facultés/départements)
+        est supprimé, ainsi que les **comptes de démonstration** associés
+        (jamais un compte super-admin ni un compte rattaché à une autre
+        université).
+        """
+        from django.db.models import Q  # import local : évite toute boucle d'imports
+
+        demo = University.objects.filter(name=DEFAULT_UNIVERSITY).first()
+        if demo is None:
+            return False
+
+        students = Student.objects.filter(
+            Q(faculty__university=demo) | Q(department__faculty__university=demo)
+        )
+        teachers = Teacher.objects.filter(faculty__university=demo)
+        courses = Course.objects.filter(department__faculty__university=demo)
+        student_ids = list(students.values_list("id", flat=True))
+        teacher_ids = list(teachers.values_list("id", flat=True))
+
+        # Comptes de démo concernés (profils → comptes, jamais d'admin).
+        demo_users = list(
+            User.objects.filter(
+                Q(student_profile__id__in=student_ids)
+                | Q(teacher_profile__id__in=teacher_ids)
+            )
+            .distinct()
+            .values_list("id", flat=True)
+        )
+
+        deleted_tickets = Ticket.objects.filter(
+            Q(student_id__in=student_ids)
+            | Q(teacher_id__in=teacher_ids)
+            | Q(course__in=courses)
+            | Q(problem_type__university=demo)
+        ).count()
+
+        # Ordonnancement satisfaisant les contraintes PROTECT.
+        Ticket.objects.filter(
+            Q(student_id__in=student_ids)
+            | Q(teacher_id__in=teacher_ids)
+            | Q(course__in=courses)
+            | Q(problem_type__university=demo)
+        ).delete()
+        Enrollment.objects.filter(student_id__in=student_ids).delete()
+        CourseAssignment.objects.filter(course__in=courses).delete()
+        ServiceAssignment.objects.filter(service__university=demo).delete()
+        StudentProgram.objects.filter(student_id__in=student_ids).delete()
+        teachers.delete()
+        students.delete()
+        courses.delete()
+        Program.objects.filter(department__faculty__university=demo).delete()
+        ProblemType.objects.filter(university=demo).delete()
+        Service.objects.filter(university=demo).delete()
+        # Faculty.university est PROTECT : facultés (cascade des départements)
+        # supprimées avant l'université.
+        Faculty.objects.filter(university=demo).delete()
+        demo.delete()
+
+        User.objects.filter(id__in=demo_users).exclude(
+            Q(is_superuser=True) | Q(is_staff=True)
+        ).delete()
+
+        self.stdout.write(
+            f"Jeu UDS précédent vidé : {deleted_tickets} ticket(s), "
+            f"{len(teacher_ids)} enseignant(s), {len(student_ids)} étudiant(s), "
+            f"{len(demo_users)} compte(s) supprimé(s)."
+        )
+        return True
 
     def _purge_legacy(self) -> bool:
         """
