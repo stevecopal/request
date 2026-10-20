@@ -119,6 +119,7 @@ services:
         condition: service_healthy
     networks:
       - univreq-internal
+      - proxy-net
     healthcheck:
       # /manifest.json : page publique légère, sans authentification.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/manifest.json', timeout=5)"]
@@ -131,6 +132,8 @@ services:
 networks:
   univreq-internal:
     driver: bridge
+  proxy-net:
+    external: true
 
 volumes:
   univreq_pgdata:
